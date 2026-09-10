@@ -27,6 +27,7 @@
 #include "system/tcg.h"
 #include "system/replay.h"
 #include "exec/icount.h"
+/* skew 接入：引入模式判断及计数/时钟接口，复用现有 TCG 执行路径。 */
 #include "exec/skew.h"
 #include "qemu/main-loop.h"
 #include "qemu/notify.h"
@@ -87,6 +88,7 @@ static void *mttcg_cpu_thread_fn(void *arg)
 
     do {
         if (skew_enabled()) {
+            /* 持有 BQL 时移除停机/空闲成员，避免它阻塞活跃 CPU 的最小进度。 */
             skew_cpu_idle(cpu);
         }
         qemu_process_cpu_events(cpu);
@@ -94,15 +96,18 @@ static void *mttcg_cpu_thread_fn(void *arg)
         if (cpu_can_run(cpu)) {
             int r;
             if (skew_enabled()) {
+                /* 执行前重新加入活动集合并分配窗口内预算，之后释放 BQL 并行执行。 */
                 skew_cpu_prepare(cpu);
             }
             bql_unlock();
             r = tcg_cpu_exec(cpu);
+            /* 先完成原子指令的独占重试，再统一结算；改写返回码避免 switch 重复执行。 */
             if (skew_enabled() && r == EXCP_ATOMIC) {
                 cpu_exec_step_atomic(cpu);
                 r = EXCP_INTERRUPT;
             }
             if (skew_enabled()) {
+                /* 仍在 vCPU 线程内发布完成量；协调器通过原子读取观察该计数。 */
                 skew_cpu_account(cpu);
             }
             bql_lock();
@@ -125,6 +130,7 @@ static void *mttcg_cpu_thread_fn(void *arg)
                 break;
             }
             if (skew_enabled()) {
+                /* 重新持有 BQL 后检查领先上限，必要时睡眠并让出 BQL。 */
                 skew_cpu_wait(cpu);
             }
         }
@@ -144,6 +150,7 @@ void mttcg_start_vcpu_thread(CPUState *cpu)
     g_assert(tcg_enabled());
     tcg_cpu_init_cflags(cpu, current_machine->smp.max_cpus > 1);
     if (skew_enabled()) {
+        /* 为每个 vCPU 暴露只读原始计数，供 QMP 验证精确指令数。 */
         skew_register_cpu(cpu);
     }
 

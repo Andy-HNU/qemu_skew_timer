@@ -30,6 +30,7 @@ user_ss.add(files(
 system_ss.add(files(
   'cputlb.c',
   'icount-common.c',
+  # skew 只链接进系统模拟 TCG；用户态模拟通过头文件恒关闭。
   'skew.c',
   'monitor.c',
   'tcg-accel-ops.c',

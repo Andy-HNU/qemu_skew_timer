@@ -29,6 +29,7 @@
 #include "qemu/target-info.h"
 #include "exec/log.h"
 #include "exec/icount.h"
+/* skew 接入：引入模式判断及计数/时钟接口，复用现有 TCG 执行路径。 */
 #include "exec/skew.h"
 #include "accel/tcg/cpu-ops.h"
 #include "tb-jmp-cache.h"
@@ -183,6 +184,10 @@ void cpu_restore_state_from_tb(CPUState *cpu, TranslationBlock *tb,
     }
 
     if (tb_cflags(tb) & CF_USE_ICOUNT) {
+        /*
+         * 异常或 MMIO 导致 TB 提前退出时，skew 也要退还未执行指令的预算。
+         * 结算使用修正后的递减器，不能直接把整个 TB 长度算作完成量。
+         */
         assert(icount_enabled() || skew_enabled());
         /*
          * Reset the cycle counter to the start of the block and

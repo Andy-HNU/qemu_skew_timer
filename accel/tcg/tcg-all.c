@@ -40,6 +40,7 @@
 #include "hw/boards.h"
 #include "exec/tb-flush.h"
 #include "system/runstate.h"
+/* skew 接入：引入模式判断及计数/时钟接口，复用现有 TCG 执行路径。 */
 #include "exec/skew.h"
 #endif
 #include "accel/accel-ops.h"
@@ -55,6 +56,7 @@ struct TCGState {
     bool one_insn_per_tb;
     int splitwx_enabled;
     unsigned long tb_size;
+    /* 分别保存领先窗口（ns）、模拟指令率（insn/s）、宿主轮询间隔（ns）。 */
     uint64_t skew_ns, skew_ips, skew_update_ns;
 };
 typedef struct TCGState TCGState;
@@ -76,9 +78,11 @@ static void tcg_accel_instance_init(Object *obj)
 {
     TCGState *s = TCG_STATE(obj);
 
+    /* 默认每模拟秒 20 亿条指令、每 100 微秒协调一次；skew_ns 为零时关闭。 */
     s->skew_ips = 2000000000;
     s->skew_update_ns = 100000;
 #ifndef CONFIG_USER_ONLY
+    /* 系统模拟的 -accel 属性入口；用户态模拟不注册这些参数。 */
     object_property_add_uint64_ptr(obj, "skew", &s->skew_ns,
                                    OBJ_PROP_FLAG_READWRITE);
     object_property_add_uint64_ptr(obj, "skew-ips", &s->skew_ips,
@@ -157,6 +161,10 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
     }
 
     qemu_add_vm_change_state_handler(tcg_vm_change_state, NULL);
+    /*
+     * 非零窗口才启用；要求明确的 MTTCG 多线程模式，并排除 icount/replay。
+     * 初始化成功后注册机器级只读 skew-time，便于 QMP 观测。
+     */
     if (s->skew_ns) {
         if (!mttcg_supported || s->mttcg_enabled != ON_OFF_AUTO_ON ||
             icount_enabled() || replay_mode != REPLAY_MODE_NONE) {

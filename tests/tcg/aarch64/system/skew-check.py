@@ -12,6 +12,7 @@ import tempfile
 import time
 
 
+# QMP 控制与 QOM 读取：通过 Unix socket 驱动暂停、恢复和只读计数观测。
 class QMP:
     def __init__(self, path):
         self.sock = socket.socket(socket.AF_UNIX)
@@ -21,6 +22,7 @@ class QMP:
         self.file.readline()
         self.cmd("qmp_capabilities")
 
+    # 同步发送命令并跳过异步事件；只有明确允许的负面测试接收 error。
     def cmd(self, name, _allow_error=False, **args):
         self.file.write(json.dumps({"execute": name, "arguments": args}).encode()
                         + b"\n")
@@ -41,12 +43,14 @@ class QMP:
         self.sock.close()
 
 
+# 最小 GDB remote 客户端，用断点把计数读取固定到 guest 的指令边界。
 class GDB:
     def __init__(self, path):
         self.sock = socket.socket(socket.AF_UNIX)
         self.sock.settimeout(60)
         self.sock.connect(str(path))
 
+    # 按远程协议封装报文与校验和，读取应答并发送确认。
     def cmd(self, command):
         body = command.encode()
         self.sock.sendall(b"$" + body + b"#" + f"{sum(body) % 256:02x}".encode())
@@ -61,10 +65,12 @@ class GDB:
         self.sock.sendall(b"+")
         return data.decode()
 
+    # 插入/移除 AArch64 软件断点，配合起止符号精确测量完成指令数。
     def bp(self, addr, insert=True):
         assert self.cmd(f"{'Z' if insert else 'z'}0,{addr:x},4") == "OK"
 
 
+# 等待 QEMU 创建控制 socket；启动失败或超时立即使测试失败。
 def wait_socket(path, proc):
     end = time.monotonic() + 15
     while not path.exists():
@@ -73,6 +79,7 @@ def wait_socket(path, proc):
         time.sleep(0.01)
 
 
+# 按 MODE 编译独立裸机 ELF；SKEW 控制是否强制验证 skew 特有超时结果。
 def build_guest(out, mode, skew=True):
     source = Path(__file__).resolve().parent
     elf = out / f"guest-{mode}-{int(skew)}.elf"
@@ -86,6 +93,7 @@ def build_guest(out, mode, skew=True):
     return elf
 
 
+# 统一 virt/GICv2/MTTCG 命令行；baseline 只移除 skew 参数以便对照。
 def command(qemu, elf, smp=2, skew=True, ips=2000000000,
             window=1000000, update=100000):
     accel = "tcg,thread=multi"
@@ -97,6 +105,7 @@ def command(qemu, elf, smp=2, skew=True, ips=2000000000,
             "enable=on,target=native", "-kernel", str(elf)]
 
 
+# 逐条复算 raw 到 logical、最小活跃进度、窗口上限及跳时后的时钟公式。
 def parse_trace(path, ips, window):
     previous_ns = previous_global = 0
     samples = {}
@@ -105,6 +114,7 @@ def parse_trace(path, ips, window):
     callbacks = []
     for line in path.read_text().splitlines():
         fields = dict((k, int(v)) for k, v in re.findall(r"(\w+)=(-?\d+)", line))
+        # 设备回调不得早于阈值；迟到量由 counter 差乘计数周期换算为纳秒。
         if "arm_gt_timer_expire " in line:
             assert fields["count"] >= fields["cval"], line
             callbacks.append((fields["count"] - fields["cval"]) * fields["period"])
@@ -112,6 +122,7 @@ def parse_trace(path, ips, window):
             assert fields["logical"] == (fields["logical_base"] + fields["raw"]
                                           - fields["raw_base"]), line
             samples[fields["cpu"]] = fields
+        # 采样来自本次推进之前，因此领先上限相对 previous_global 计算。
         elif "skew_clock " in line:
             now, glob = fields["ns"], fields["global"]
             assert now >= previous_ns and glob >= previous_global, line
@@ -131,6 +142,7 @@ def parse_trace(path, ips, window):
             if fields["waiting"]:
                 assert fields["logical"] - fields["global"] == window * ips // 10**9
                 waits += 1
+        # 只允许无活跃成员时跳时，并累计偏移以验证后续时钟公式。
         elif "skew_warp " in line:
             assert not any(s["active"] for s in samples.values()), line
             assert fields["delta"] > 0
@@ -142,17 +154,20 @@ def parse_trace(path, ips, window):
                 callback_lateness_ns=callbacks)
 
 
+# 编译运行单个场景，保存输出，检查退出码/PASS，并按需检查 trace。
 def run_guest(qemu, out, mode, skew=True, trace=False, delay_cpu=None,
               native_icount=False, **params):
     elf = build_guest(out, mode, skew)
     cmd = command(qemu, elf, smp=1 if mode == 1 else 2, skew=skew, **params)
     if mode == 11:
         cmd[cmd.index("-M") + 1] += ",virtualization=on"
+    # 传统 icount 对照改用单线程；它与 MTTCG skew 不能同时启用。
     if native_icount:
         cmd[cmd.index("-accel") + 1] = "tcg,thread=single"
         cmd += ["-icount", "shift=0,sleep=off"]
     name = f"mode{mode}-{'skew' if skew else 'baseline'}-{len(list(out.glob('*.log')))}"
     log = out / (name + ".log")
+    # 临时编译延迟插件，以宿主睡眠人为制造快慢核，验证 skew 对调度不均的约束。
     if delay_cpu is not None:
         source = Path(__file__).resolve().parent
         plugin = out / "skew-delay.so"
@@ -178,6 +193,7 @@ def run_guest(qemu, out, mode, skew=True, trace=False, delay_cpu=None,
     ips = params.get("ips", 2000000000)
     window = params.get("window", 1000000)
     freq = next(int(a) for name, a, b in rows if name == "FREQ")
+    # 统一时间读数可能落后局部执行进度，比例验收为起止两端保留窗口容差。
     if mode == 1 and skew and not native_icount:
         for name, count, ticks in result["records"]:
             if name.startswith("COUNT_"):
@@ -190,6 +206,7 @@ def run_guest(qemu, out, mode, skew=True, trace=False, delay_cpu=None,
     return result
 
 
+# 用 GDB 起止断点读取 raw 差值；tiny 强制跨越很小的预算边界。
 def exact_counts(qemu, out, tiny=False):
     elf = build_guest(out, 9 if tiny else 1)
     symbols = {}
@@ -214,10 +231,12 @@ def exact_counts(qemu, out, tiny=False):
             qmp, gdb = QMP(qp), GDB(gp)
             cpu = qmp.cmd("query-cpus-fast")[0]["qom-path"]
             results = []
+            # 预期包括起始 ISB/MRS 两条；结束标签处断点尚未执行该标签后的指令。
             cases = [("short_loop", "short_end", 64000002),
                      ("long_loop", "long_end", 64000002),
                      ("long_loop", "long_end", 128000002),
                      ("fault_probe", "fault_end", 36)]
+            # 极小窗口时采用短工作量，同时保留 MMIO/SVC 的 36 条精确计数验证。
             if tiny:
                 cases = [("short_loop", "short_end", 36),
                          ("long_loop", "long_end", 226),
@@ -254,6 +273,7 @@ def exact_counts(qemu, out, tiny=False):
                 gdb.sock.close()
 
 
+# 验证两个独立 vCPU 线程、暂停冻结、迁移拒绝及 UART 外部唤醒。
 def controls(qemu, out, idle=False):
     elf = build_guest(out, 10 if idle else 8)
     with tempfile.TemporaryDirectory(prefix="skew-") as temp:
@@ -280,6 +300,7 @@ def controls(qemu, out, idle=False):
                     os.sched_setaffinity(tid, {core})
             qmp.cmd("cont")
             time.sleep(0.1)
+            # 无定时器且全空闲时，250ms 宿主时间内虚拟时钟和 raw 均应保持不变。
             if idle:
                 clock = qmp.get("/machine", "skew-time")
                 raw = [qmp.get(c["qom-path"], "skew-raw-icount") for c in cpus]
@@ -294,6 +315,7 @@ def controls(qemu, out, idle=False):
                 assert proc.returncode == 0 and "PASS" in output, output
                 return dict(all_idle_no_timer=True, stable_host_ms=250,
                             stable_virtual_ns=clock, external_irq_wake=True)
+            # 从宿主线程 schedstat 采样运行时间，报告并行运行比例。
             def runtime(tid):
                 return int(Path(f"/proc/{proc.pid}/task/{tid}/schedstat")
                            .read_text().split()[0])
@@ -304,6 +326,7 @@ def controls(qemu, out, idle=False):
             runtime_ns = [runtime(tid) - b for tid, b in zip(tids, before)]
             assert all(t > 0 for t in runtime_ns)
             prior = 0
+            # 反复 stop/cont，暂停期间要求时钟和每核 raw 完全相等，恢复后不得倒退。
             for _ in range(100):
                 qmp.cmd("stop")
                 assert not qmp.cmd("query-status")["running"]
@@ -340,6 +363,7 @@ def controls(qemu, out, idle=False):
                 serial.close()
 
 
+# 负面配置必须明确拒绝，不能悄悄退回其他时钟模式。
 def invalid_options(qemu):
     cases = ["tcg,thread=single,skew=1000000", "tcg,skew=1,skew-ips=1",
              "tcg,skew=1000000,skew-ips=0", "tcg,skew=1000000001",
@@ -356,6 +380,7 @@ def invalid_options(qemu):
     return dict(invalid_configurations_rejected=len(cases) + 1)
 
 
+# quick 仍覆盖精确计数、控制、窗口与定时器；完整模式追加参数矩阵和压力测试。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("qemu", type=Path)
@@ -366,6 +391,7 @@ def main():
     qemu = args.qemu.resolve()
     results = []
 
+    # 每完成一个场景就写 JSON，保留后续失败之前已完成的证据。
     def save(result):
         results.append(result)
         (args.output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
@@ -379,6 +405,7 @@ def main():
     save(controls(qemu, args.output, idle=True))
     for mode in (1, 2, 3, 4, 12):
         save(run_guest(qemu, args.output, mode, trace=True))
+    # 完整矩阵包含普通 MTTCG 对照、不同指令率/窗口、慢核插件和传统 icount。
     if not args.quick:
         for mode in (1, 2, 3, 4):
             save(run_guest(qemu, args.output, mode, skew=False))

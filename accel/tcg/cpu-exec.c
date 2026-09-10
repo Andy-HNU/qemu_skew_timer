@@ -37,6 +37,7 @@
 #include "exec/log.h"
 #include "qemu/main-loop.h"
 #include "exec/icount.h"
+/* skew 接入：引入模式判断及计数/时钟接口，复用现有 TCG 执行路径。 */
 #include "exec/skew.h"
 #include "exec/replay-core.h"
 #include "system/tcg.h"
@@ -768,6 +769,7 @@ void tcg_kick_vcpu_thread(CPUState *cpu)
 
 static inline bool icount_exit_request(CPUState *cpu)
 {
+    /* skew 同样使用指令预算；预算耗尽必须退出，才能交给 MTTCG 线程结算。 */
     if (!icount_enabled() && !skew_enabled()) {
         return false;
     }
@@ -823,6 +825,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
 
             if (cpu_test_interrupt(cpu, CPU_INTERRUPT_RESET)) {
                 replay_interrupt();
+                /* 复位可能清除执行状态，先结算本轮已经完成的指令，避免丢失计数。 */
                 if (skew_enabled()) {
                     skew_cpu_account(cpu);
                 }
@@ -911,13 +914,19 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
     }
 
     /* Instruction counter expired.  */
+    /* 带计数的 TB 也可由 skew 生成，因此这里允许两种计数模式。 */
     assert(icount_enabled() || skew_enabled());
 #ifndef CONFIG_USER_ONLY
+    /* skew 的全局时间仅由协调器发布，不能调用传统 icount 的全局更新。 */
     /* Ensure global icount has gone forward */
     if (!skew_enabled()) {
         icount_update(cpu);
     }
     /* Refill decrementer and continue execution.  */
+    /*
+     * skew 保留本轮剩余预算，不重新发放完整预算；后续按剩余量缩短 TB。
+     * quantum 已限制为 16 位，skew 不使用 icount_extra 扩展预算。
+     */
     int32_t insns_left = skew_enabled() ? cpu->neg.icount_decr.u16.low :
                         MIN(0xffff, cpu->icount_budget);
     cpu->neg.icount_decr.u16.low = insns_left;

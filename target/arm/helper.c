@@ -1986,6 +1986,11 @@ void arm_gt_ptimer_cb(void *opaque)
 {
     ARMCPU *cpu = opaque;
 
+    /*
+
+     * 记录物理定时器回调时的阈值、扣除偏移后的计数及虚拟时间。
+     * 这是观测点；原有 gt_recalc_timer 中断更新逻辑保持不变。
+     */
     trace_arm_gt_timer_expire(CPU(cpu)->cpu_index, GTIMER_PHYS,
                              cpu->env.cp15.c14_timer[GTIMER_PHYS].cval,
                              gt_get_countervalue(&cpu->env) -

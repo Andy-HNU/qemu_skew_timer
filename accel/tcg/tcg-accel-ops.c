@@ -31,6 +31,7 @@
 #include "system/tcg.h"
 #include "system/replay.h"
 #include "exec/icount.h"
+/* skew 接入：引入模式判断及计数/时钟接口，复用现有 TCG 执行路径。 */
 #include "exec/skew.h"
 #include "qemu/main-loop.h"
 #include "qemu/guest-random.h"
@@ -66,6 +67,7 @@ void tcg_cpu_init_cflags(CPUState *cpu, bool parallel)
     cflags = cpu->cluster_index << CF_CLUSTER_SHIFT;
 
     cflags |= parallel ? CF_PARALLEL : 0;
+    /* 让 TB 生成指令递减检查；这里只复用计数机制，不启用传统 icount 调度。 */
     cflags |= (icount_enabled() || skew_enabled()) ? CF_USE_ICOUNT : 0;
     tcg_cflags_set(cpu, cflags);
 }
@@ -207,6 +209,7 @@ static void tcg_accel_ops_init(AccelClass *ac)
         ops->create_vcpu_thread = mttcg_start_vcpu_thread;
         ops->kick_vcpu_thread = tcg_kick_vcpu_thread;
         ops->handle_interrupt = tcg_handle_interrupt;
+        /* 统一虚拟纳秒时钟与 elapsed ticks 来源，使设备计时跟随 skew 进度。 */
         if (skew_enabled()) {
             ops->get_virtual_clock = skew_get_clock;
             ops->get_elapsed_ticks = skew_get_clock;

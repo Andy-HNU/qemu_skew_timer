@@ -30,8 +30,13 @@ store_atom16_fallback(uint32_t memop, uintptr_t ra) "mop:0x%"PRIx32", ra:0x%"PRI
 tb_flush(void) ""
 
 # skew.c
+# 每轮协调后的全局进度、虚拟纳秒与活跃成员数。
 skew_clock(int64_t host_ns, uint64_t global, int64_t ns, unsigned active) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" active=%u"
+# CPU 加入/离开活动集合时记录 raw、logical 与全局基准。
 skew_cpu(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t logical, uint64_t global) "host_ns=%"PRId64" cpu=%d active=%d raw=%"PRIu64" logical=%"PRIu64" global=%"PRIu64
+# 窗口边界等待的进入/退出，用来验证限速而非忙等。
 skew_wait(int64_t host_ns, int cpu, bool waiting, uint64_t raw, uint64_t logical, uint64_t global) "host_ns=%"PRId64" cpu=%d waiting=%d raw=%"PRIu64" logical=%"PRIu64" global=%"PRIu64
+# 全空闲跳时的偏移量，供验收重建虚拟时间公式。
 skew_warp(int64_t host_ns, uint64_t global, int64_t ns, int64_t delta) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" delta=%"PRId64
+# 协调更新前的逐 CPU 快照，供验收复算逻辑进度及窗口上限。
 skew_sample(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t raw_base, uint64_t logical_base, uint64_t logical) "host_ns=%"PRId64" cpu=%d active=%d raw=%"PRIu64" raw_base=%"PRIu64" logical_base=%"PRIu64" logical=%"PRIu64

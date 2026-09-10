@@ -237,6 +237,7 @@ DEF("accel", HAS_ARG, QEMU_OPTION_accel,
     "                eager-split-size=n (KVM Eager Page Split chunk size, default 0, disabled. ARM only)\n"
     "                notify-vmexit=run|internal-error|disable,notify-window=n (enable notify VM exit and set notify window, x86 only)\n"
     "                thread=single|multi (enable multi-threaded TCG)\n"
+    /* 命令行帮助公开 skew 的三项参数；由 TCG 的 QOM 属性接收。 */
     "                skew=ns,skew-ips=n,skew-update=ns (MTTCG instruction clock)\n"
     "                device=path (KVM device path, default /dev/kvm)\n", QEMU_ARCH_ALL)
 SRST
@@ -284,6 +285,9 @@ SRST
         where both the back-end and front-ends support it and no
         incompatible TCG features have been enabled (e.g.
         icount/replay).
+
+    .. 中文说明：skew 限制单 CPU 的领先量；skew-ips 换算模拟时间。
+       skew-update 是宿主协调间隔，不能视作虚拟时钟步长或定时器延迟上界。
 
     ``skew=ns,skew-ips=n,skew-update=ns``
         Enable the single-instance MTTCG instruction-driven clock with a
