@@ -29,6 +29,7 @@
 #include "qemu/target-info.h"
 #include "exec/log.h"
 #include "exec/icount.h"
+#include "exec/skew.h"
 #include "accel/tcg/cpu-ops.h"
 #include "tb-jmp-cache.h"
 #include "tb-hash.h"
@@ -182,7 +183,7 @@ void cpu_restore_state_from_tb(CPUState *cpu, TranslationBlock *tb,
     }
 
     if (tb_cflags(tb) & CF_USE_ICOUNT) {
-        assert(icount_enabled());
+        assert(icount_enabled() || skew_enabled());
         /*
          * Reset the cycle counter to the start of the block and
          * shift if to the number of actually executed instructions.

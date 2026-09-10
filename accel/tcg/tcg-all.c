@@ -40,6 +40,7 @@
 #include "hw/boards.h"
 #include "exec/tb-flush.h"
 #include "system/runstate.h"
+#include "exec/skew.h"
 #endif
 #include "accel/accel-ops.h"
 #include "accel/accel-cpu-ops.h"
@@ -54,6 +55,7 @@ struct TCGState {
     bool one_insn_per_tb;
     int splitwx_enabled;
     unsigned long tb_size;
+    uint64_t skew_ns, skew_ips, skew_update_ns;
 };
 typedef struct TCGState TCGState;
 
@@ -74,6 +76,16 @@ static void tcg_accel_instance_init(Object *obj)
 {
     TCGState *s = TCG_STATE(obj);
 
+    s->skew_ips = 2000000000;
+    s->skew_update_ns = 100000;
+#ifndef CONFIG_USER_ONLY
+    object_property_add_uint64_ptr(obj, "skew", &s->skew_ns,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_add_uint64_ptr(obj, "skew-ips", &s->skew_ips,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_add_uint64_ptr(obj, "skew-update", &s->skew_update_ns,
+                                   OBJ_PROP_FLAG_READWRITE);
+#endif
     /* If debugging enabled, default "auto on", otherwise off. */
 #if defined(CONFIG_DEBUG_TCG) && !defined(CONFIG_USER_ONLY)
     s->splitwx_enabled = -1;
@@ -145,6 +157,19 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
     }
 
     qemu_add_vm_change_state_handler(tcg_vm_change_state, NULL);
+    if (s->skew_ns) {
+        if (!mttcg_supported || s->mttcg_enabled != ON_OFF_AUTO_ON ||
+            icount_enabled() || replay_mode != REPLAY_MODE_NONE) {
+            error_report("skew requires MTTCG without -icount "
+                         "or record/replay");
+            return -EINVAL;
+        }
+        if (!skew_init(s->skew_ns, s->skew_ips, s->skew_update_ns,
+                       &error_fatal)) {
+            return -EINVAL;
+        }
+        skew_register_clock(OBJECT(ms));
+    }
 #endif
 
     tcg_allowed = true;

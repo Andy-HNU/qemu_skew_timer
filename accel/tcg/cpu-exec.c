@@ -37,6 +37,7 @@
 #include "exec/log.h"
 #include "qemu/main-loop.h"
 #include "exec/icount.h"
+#include "exec/skew.h"
 #include "exec/replay-core.h"
 #include "system/tcg.h"
 #include "exec/helper-proto-common.h"
@@ -767,7 +768,7 @@ void tcg_kick_vcpu_thread(CPUState *cpu)
 
 static inline bool icount_exit_request(CPUState *cpu)
 {
-    if (!icount_enabled()) {
+    if (!icount_enabled() && !skew_enabled()) {
         return false;
     }
     if (cpu->cflags_next_tb != -1 && !(cpu->cflags_next_tb & CF_USE_ICOUNT)) {
@@ -822,6 +823,9 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
 
             if (cpu_test_interrupt(cpu, CPU_INTERRUPT_RESET)) {
                 replay_interrupt();
+                if (skew_enabled()) {
+                    skew_cpu_account(cpu);
+                }
                 tcg_ops->cpu_exec_reset(cpu);
                 bql_unlock();
                 return true;
@@ -907,14 +911,19 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
     }
 
     /* Instruction counter expired.  */
-    assert(icount_enabled());
+    assert(icount_enabled() || skew_enabled());
 #ifndef CONFIG_USER_ONLY
     /* Ensure global icount has gone forward */
-    icount_update(cpu);
+    if (!skew_enabled()) {
+        icount_update(cpu);
+    }
     /* Refill decrementer and continue execution.  */
-    int32_t insns_left = MIN(0xffff, cpu->icount_budget);
+    int32_t insns_left = skew_enabled() ? cpu->neg.icount_decr.u16.low :
+                        MIN(0xffff, cpu->icount_budget);
     cpu->neg.icount_decr.u16.low = insns_left;
-    cpu->icount_extra = cpu->icount_budget - insns_left;
+    if (!skew_enabled()) {
+        cpu->icount_extra = cpu->icount_budget - insns_left;
+    }
 
     /*
      * If the next tb has more instructions than we have left to

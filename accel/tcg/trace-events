@@ -28,3 +28,10 @@ store_atom16_fallback(uint32_t memop, uintptr_t ra) "mop:0x%"PRIx32", ra:0x%"PRI
 
 # tb-maint.c
 tb_flush(void) ""
+
+# skew.c
+skew_clock(int64_t host_ns, uint64_t global, int64_t ns, unsigned active) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" active=%u"
+skew_cpu(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t logical, uint64_t global) "host_ns=%"PRId64" cpu=%d active=%d raw=%"PRIu64" logical=%"PRIu64" global=%"PRIu64
+skew_wait(int64_t host_ns, int cpu, bool waiting, uint64_t raw, uint64_t logical, uint64_t global) "host_ns=%"PRId64" cpu=%d waiting=%d raw=%"PRIu64" logical=%"PRIu64" global=%"PRIu64
+skew_warp(int64_t host_ns, uint64_t global, int64_t ns, int64_t delta) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" delta=%"PRId64
+skew_sample(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t raw_base, uint64_t logical_base, uint64_t logical) "host_ns=%"PRId64" cpu=%d active=%d raw=%"PRIu64" raw_base=%"PRIu64" logical_base=%"PRIu64" logical=%"PRIu64

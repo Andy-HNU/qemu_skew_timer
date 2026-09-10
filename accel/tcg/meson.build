@@ -30,6 +30,7 @@ user_ss.add(files(
 system_ss.add(files(
   'cputlb.c',
   'icount-common.c',
+  'skew.c',
   'monitor.c',
   'tcg-accel-ops.c',
   'tcg-accel-ops-icount.c',

@@ -1,6 +1,7 @@
 # See docs/devel/tracing.rst for syntax documentation.
 
 # helper.c
+arm_gt_timer_expire(int cpu, int timer, uint64_t cval, uint64_t count, unsigned period, int64_t ns) "cpu=%d timer=%d cval=%"PRIu64" count=%"PRIu64" period=%u ns=%"PRId64
 arm_gt_recalc(int timer, uint64_t nexttick) "gt recalc: timer %d next tick 0x%" PRIx64
 arm_gt_recalc_disabled(int timer) "gt recalc: timer %d timer disabled"
 arm_gt_cval_write(int timer, uint64_t value) "gt_cval_write: timer %d value 0x%" PRIx64

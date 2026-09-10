@@ -27,6 +27,7 @@
 #include "system/tcg.h"
 #include "system/replay.h"
 #include "exec/icount.h"
+#include "exec/skew.h"
 #include "qemu/main-loop.h"
 #include "qemu/notify.h"
 #include "qemu/guest-random.h"
@@ -85,12 +86,25 @@ static void *mttcg_cpu_thread_fn(void *arg)
     qemu_guest_random_seed_thread_part2(cpu->random_seed);
 
     do {
+        if (skew_enabled()) {
+            skew_cpu_idle(cpu);
+        }
         qemu_process_cpu_events(cpu);
 
         if (cpu_can_run(cpu)) {
             int r;
+            if (skew_enabled()) {
+                skew_cpu_prepare(cpu);
+            }
             bql_unlock();
             r = tcg_cpu_exec(cpu);
+            if (skew_enabled() && r == EXCP_ATOMIC) {
+                cpu_exec_step_atomic(cpu);
+                r = EXCP_INTERRUPT;
+            }
+            if (skew_enabled()) {
+                skew_cpu_account(cpu);
+            }
             bql_lock();
             switch (r) {
             case EXCP_DEBUG:
@@ -110,6 +124,9 @@ static void *mttcg_cpu_thread_fn(void *arg)
                 /* Ignore everything else? */
                 break;
             }
+            if (skew_enabled()) {
+                skew_cpu_wait(cpu);
+            }
         }
     } while (!cpu->unplug || cpu_can_run(cpu));
 
@@ -126,6 +143,9 @@ void mttcg_start_vcpu_thread(CPUState *cpu)
 
     g_assert(tcg_enabled());
     tcg_cpu_init_cflags(cpu, current_machine->smp.max_cpus > 1);
+    if (skew_enabled()) {
+        skew_register_cpu(cpu);
+    }
 
     /* create a thread per vCPU with TCG (MTTCG) */
     snprintf(thread_name, VCPU_THREAD_NAME_SIZE, "CPU %d/TCG",

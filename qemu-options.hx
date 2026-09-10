@@ -237,6 +237,7 @@ DEF("accel", HAS_ARG, QEMU_OPTION_accel,
     "                eager-split-size=n (KVM Eager Page Split chunk size, default 0, disabled. ARM only)\n"
     "                notify-vmexit=run|internal-error|disable,notify-window=n (enable notify VM exit and set notify window, x86 only)\n"
     "                thread=single|multi (enable multi-threaded TCG)\n"
+    "                skew=ns,skew-ips=n,skew-update=ns (MTTCG instruction clock)\n"
     "                device=path (KVM device path, default /dev/kvm)\n", QEMU_ARCH_ALL)
 SRST
 ``-accel name[,prop=value[,...]]``
@@ -283,6 +284,23 @@ SRST
         where both the back-end and front-ends support it and no
         incompatible TCG features have been enabled (e.g.
         icount/replay).
+
+    ``skew=ns,skew-ips=n,skew-update=ns``
+        Enable the single-instance MTTCG instruction-driven clock with a
+        maximum per-vCPU lead of ``skew`` nanoseconds (default 0, disabled).
+        ``skew-ips`` calibrates guest instructions per simulated second
+        (default 2000000000). ``skew-update`` is the host coordinator polling
+        interval in nanoseconds (default 100000); it is not a bound on
+        virtual clock steps or timer delivery latency. Both intervals must
+        be at most one second and cover at least one guest instruction.
+        The maximum supported instruction rate is 1000000000000.
+
+        All guest CPUs share the minimum active CPU progress as virtual
+        time. CPUs at the lead limit wait while remaining active. When all
+        CPUs are idle, virtual time can jump to the next virtual timer.
+        The clock stops with the VM. Choose a lead substantially smaller
+        than the guest timeout margin. Migration, snapshots, record/replay,
+        ``-icount``, and single-thread TCG are not supported in this mode.
 
     ``dirty-ring-size=n``
         When the KVM accelerator is used, it controls the size of the per-vCPU

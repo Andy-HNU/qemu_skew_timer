@@ -509,6 +509,12 @@ struct CPUState {
     int singlestep_enabled;
     int64_t icount_budget;
     int64_t icount_extra;
+    /* MTTCG skew clock: raw is atomic; membership and bases use the BQL. */
+    uint64_t skew_raw_icount;
+    uint64_t skew_raw_base;
+    uint64_t skew_logical_base;
+    bool skew_active;
+    bool skew_waiting;
     uint64_t random_seed;
     sigjmp_buf jmp_env;
 
