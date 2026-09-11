@@ -767,16 +767,32 @@ void tcg_kick_vcpu_thread(CPUState *cpu)
     qatomic_store_release(&cpu->neg.icount_decr.u16.high, -1);
 }
 
+/* 仅判断传统 icount 的执行预算，不负责 MTTCG skew 窗口。 */
 static inline bool icount_exit_request(CPUState *cpu)
 {
-    /* skew 同样使用指令预算；预算耗尽必须退出，才能交给 MTTCG 线程结算。 */
-    if (!icount_enabled() && !skew_enabled()) {
+    if (!icount_enabled()) {
         return false;
     }
     if (cpu->cflags_next_tb != -1 && !(cpu->cflags_next_tb & CF_USE_ICOUNT)) {
         return false;
     }
     return cpu->neg.icount_decr.u16.low + cpu->icount_extra == 0;
+}
+
+/*
+ * 仅判断 skew 本轮执行预算是否耗尽；不推进时钟，也不在这里等待窗口。
+ * skew_cpu_prepare() 将预算限制在 16 位内，不使用 icount_extra。
+ * 特殊的非计数 TB 必须仍能执行，预算结算和等待由 MTTCG 公共调度路径处理。
+ */
+static inline bool skew_exit_request(CPUState *cpu)
+{
+    if (!skew_enabled()) {
+        return false;
+    }
+    if (cpu->cflags_next_tb != -1 && !(cpu->cflags_next_tb & CF_USE_ICOUNT)) {
+        return false;
+    }
+    return cpu->neg.icount_decr.u16.low == 0;
 }
 
 static inline bool cpu_handle_interrupt(CPUState *cpu,
@@ -880,7 +896,9 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
      * Finally, check if we need to exit to the main loop.
      * The corresponding store-release is in cpu_exit.
      */
-    if (unlikely(qatomic_load_acquire(&cpu->exit_request)) || icount_exit_request(cpu)) {
+    /* CPU 执行循环汇聚外部退出请求和各时间模型的独立预算退出请求。 */
+    if (unlikely(qatomic_load_acquire(&cpu->exit_request)) ||
+        icount_exit_request(cpu) || skew_exit_request(cpu)) {
         if (cpu->exception_index == -1) {
             cpu->exception_index = EXCP_INTERRUPT;
         }
