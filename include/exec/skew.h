@@ -34,4 +34,7 @@ void skew_cpu_account(CPUState *cpu);
 /* 持有 BQL：到达窗口边界时等待；等待操作会释放并重新取得 BQL。 */
 void skew_cpu_wait(CPUState *cpu);
 
+/* 此时间模型提供的公共执行预算回调。 */
+extern const struct TCGExecutionBudgetOps skew_budget_ops;
+
 #endif

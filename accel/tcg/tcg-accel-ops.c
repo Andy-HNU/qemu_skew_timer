@@ -31,6 +31,7 @@
 #include "system/tcg.h"
 #include "system/replay.h"
 #include "exec/icount.h"
+#include "exec/exec-budget.h"
 /* skew 接入：引入模式判断及计数/时钟接口，复用现有 TCG 执行路径。 */
 #include "exec/skew.h"
 #include "qemu/main-loop.h"
@@ -56,6 +57,11 @@ void tcg_cpu_init_cflags(CPUState *cpu, bool parallel)
 {
     uint32_t cflags;
 
+    /* 仅在装配层选择模型，公共 TB 路径不再识别模型名称。 */
+    assert(!icount_enabled() || !skew_enabled());
+    cpu->execution_budget_ops = icount_enabled() ? &icount_budget_ops :
+                                skew_enabled() ? &skew_budget_ops : NULL;
+
     /*
      * Include the cluster number in the hash we use to look up TBs.
      * This is important because a TB that is valid for one cluster at
@@ -68,7 +74,7 @@ void tcg_cpu_init_cflags(CPUState *cpu, bool parallel)
 
     cflags |= parallel ? CF_PARALLEL : 0;
     /* 让 TB 生成指令递减检查；这里只复用计数机制，不启用传统 icount 调度。 */
-    cflags |= (icount_enabled() || skew_enabled()) ? CF_USE_ICOUNT : 0;
+    cflags |= exec_budget_enabled(cpu) ? CF_USE_ICOUNT : 0;
     tcg_cflags_set(cpu, cflags);
 }
 

@@ -5,6 +5,7 @@
 #include "qemu/osdep.h"
 #include "hw/core/cpu.h"
 #include "exec/skew.h"
+#include "exec/exec-budget.h"
 #include "qemu/main-loop.h"
 #include "qemu/timer.h"
 #include "qemu/host-utils.h"
@@ -235,9 +236,8 @@ void skew_cpu_prepare(CPUState *cpu)
     /* 领先量不得超过 window；实际预算取单轮上限与剩余窗口中的较小者。 */
     lead = logical_count(cpu) - global_icount;
     assert(lead <= window);
-    cpu->icount_budget = MIN(quantum, window - lead);
-    cpu->neg.icount_decr.u16.low = cpu->icount_budget;
-    assert(cpu->icount_extra == 0);
+    cpu->skew_budget = MIN(quantum, window - lead);
+    exec_budget_set(cpu, cpu->skew_budget);
 }
 
 /*
@@ -246,14 +246,14 @@ void skew_cpu_prepare(CPUState *cpu)
  */
 void skew_cpu_account(CPUState *cpu)
 {
-    uint64_t executed = cpu->icount_budget - cpu->neg.icount_decr.u16.low;
+    uint64_t executed = cpu->skew_budget - exec_budget_remaining(cpu);
 
-    assert(executed <= cpu->icount_budget);
+    assert(executed <= cpu->skew_budget);
     /* Publish only completed instructions, including TB unwind corrections. */
     qatomic_set_u64(&cpu->skew_raw_icount,
                     qatomic_read_u64(&cpu->skew_raw_icount) + executed);
-    cpu->icount_budget = 0;
-    cpu->neg.icount_decr.u16.low = 0;
+    cpu->skew_budget = 0;
+    exec_budget_set(cpu, 0);
 }
 
 /* 到达窗口边界才等待；停机、中断退出、异步工作或 halt 都能打破等待。 */
@@ -279,3 +279,23 @@ void skew_cpu_wait(CPUState *cpu)
                         logical_count(cpu), global_icount);
     }
 }
+
+static bool skew_budget_exhausted(CPUState *cpu)
+{
+    return exec_budget_remaining(cpu) == 0;
+}
+
+/*
+ * TB 预算到期不发放新窗口，也不推进 global time。保留本轮剩余额度，
+ * 由公共层截短 TB；整轮耗尽后仍返回 MTTCG 做 raw 结算和窗口等待。
+ */
+static uint16_t skew_budget_expired(CPUState *cpu)
+{
+    return exec_budget_remaining(cpu);
+}
+
+const TCGExecutionBudgetOps skew_budget_ops = {
+    .exhausted = skew_budget_exhausted,
+    .expired = skew_budget_expired,
+    .before_reset = skew_cpu_account,
+};

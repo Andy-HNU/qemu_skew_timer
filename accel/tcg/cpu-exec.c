@@ -37,8 +37,7 @@
 #include "exec/log.h"
 #include "qemu/main-loop.h"
 #include "exec/icount.h"
-/* skew 接入：引入模式判断及计数/时钟接口，复用现有 TCG 执行路径。 */
-#include "exec/skew.h"
+#include "exec/exec-budget.h"
 #include "exec/replay-core.h"
 #include "system/tcg.h"
 #include "exec/helper-proto-common.h"
@@ -767,32 +766,13 @@ void tcg_kick_vcpu_thread(CPUState *cpu)
     qatomic_store_release(&cpu->neg.icount_decr.u16.high, -1);
 }
 
-/* 仅判断传统 icount 的执行预算，不负责 MTTCG skew 窗口。 */
-static inline bool icount_exit_request(CPUState *cpu)
+/* 公共层处理非计数 TB 例外，再交给所选模型判断整轮预算。 */
+static inline bool cpu_execution_budget_exit_request(CPUState *cpu)
 {
-    if (!icount_enabled()) {
-        return false;
-    }
     if (cpu->cflags_next_tb != -1 && !(cpu->cflags_next_tb & CF_USE_ICOUNT)) {
         return false;
     }
-    return cpu->neg.icount_decr.u16.low + cpu->icount_extra == 0;
-}
-
-/*
- * 仅判断 skew 本轮执行预算是否耗尽；不推进时钟，也不在这里等待窗口。
- * skew_cpu_prepare() 将预算限制在 16 位内，不使用 icount_extra。
- * 特殊的非计数 TB 必须仍能执行，预算结算和等待由 MTTCG 公共调度路径处理。
- */
-static inline bool skew_exit_request(CPUState *cpu)
-{
-    if (!skew_enabled()) {
-        return false;
-    }
-    if (cpu->cflags_next_tb != -1 && !(cpu->cflags_next_tb & CF_USE_ICOUNT)) {
-        return false;
-    }
-    return cpu->neg.icount_decr.u16.low == 0;
+    return exec_budget_exhausted(cpu);
 }
 
 static inline bool cpu_handle_interrupt(CPUState *cpu,
@@ -842,9 +822,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
             if (cpu_test_interrupt(cpu, CPU_INTERRUPT_RESET)) {
                 replay_interrupt();
                 /* 复位可能清除执行状态，先结算本轮已经完成的指令，避免丢失计数。 */
-                if (skew_enabled()) {
-                    skew_cpu_account(cpu);
-                }
+                exec_budget_before_reset(cpu);
                 tcg_ops->cpu_exec_reset(cpu);
                 bql_unlock();
                 return true;
@@ -896,9 +874,9 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
      * Finally, check if we need to exit to the main loop.
      * The corresponding store-release is in cpu_exit.
      */
-    /* CPU 执行循环汇聚外部退出请求和各时间模型的独立预算退出请求。 */
+    /* CPU 执行循环汇聚外部请求与公共执行预算退出请求。 */
     if (unlikely(qatomic_load_acquire(&cpu->exit_request)) ||
-        icount_exit_request(cpu) || skew_exit_request(cpu)) {
+        cpu_execution_budget_exit_request(cpu)) {
         if (cpu->exception_index == -1) {
             cpu->exception_index = EXCP_INTERRUPT;
         }
@@ -931,26 +909,11 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
         return;
     }
 
-    /* Instruction counter expired.  */
-    /* 带计数的 TB 也可由 skew 生成，因此这里允许两种计数模式。 */
-    assert(icount_enabled() || skew_enabled());
-#ifndef CONFIG_USER_ONLY
-    /* skew 的全局时间仅由协调器发布，不能调用传统 icount 的全局更新。 */
-    /* Ensure global icount has gone forward */
-    if (!skew_enabled()) {
-        icount_update(cpu);
-    }
-    /* Refill decrementer and continue execution.  */
     /*
-     * skew 保留本轮剩余预算，不重新发放完整预算；后续按剩余量缩短 TB。
-     * quantum 已限制为 16 位，skew 不使用 icount_extra 扩展预算。
+     * TB 无法在当前预算内执行。模型自行结算/续配，公共层只消费返回额度。
+     * 这里不推进任何时钟，也不依赖某一种模型的私有预算状态。
      */
-    int32_t insns_left = skew_enabled() ? cpu->neg.icount_decr.u16.low :
-                        MIN(0xffff, cpu->icount_budget);
-    cpu->neg.icount_decr.u16.low = insns_left;
-    if (!skew_enabled()) {
-        cpu->icount_extra = cpu->icount_budget - insns_left;
-    }
+    uint16_t insns_left = exec_budget_expired(cpu);
 
     /*
      * If the next tb has more instructions than we have left to
@@ -959,10 +922,8 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
      */
     if (insns_left > 0 && insns_left < tb->icount)  {
         assert(insns_left <= CF_COUNT_MASK);
-        assert(cpu->icount_extra == 0);
         cpu->cflags_next_tb = (tb->cflags & ~CF_COUNT_MASK) | insns_left;
     }
-#endif
 }
 
 /* main execution loop */

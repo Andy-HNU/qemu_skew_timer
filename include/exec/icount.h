@@ -73,4 +73,7 @@ void icount_start_warp_timer(void);
 void icount_account_warp_timer(void);
 void icount_notify_exit(void);
 
+/* 此时间模型提供的公共执行预算回调。 */
+extern const struct TCGExecutionBudgetOps icount_budget_ops;
+
 #endif /* EXEC_ICOUNT_H */
