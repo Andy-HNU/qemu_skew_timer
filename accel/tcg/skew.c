@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 #include "qemu/osdep.h"
+#include "qemu/error-report.h"
 #include "hw/core/cpu.h"
 #include "exec/skew.h"
 #include "exec/exec-budget.h"
@@ -231,7 +232,15 @@ void skew_cpu_prepare(CPUState *cpu)
     }
     /* 只受剩余窗口和 TCG 16 位装载上限约束，无独立的执行分段策略。 */
     lead = logical_count(cpu) - global_icount;
-    assert(lead <= window);
+    /* 常驻检查：禁止无符号减法下溢后发放错误预算。 */
+    if (unlikely(lead > window)) {
+        error_report("skew: CPU %d window exceeded before execution: "
+                     "lead=%" PRIu64 " window=%" PRIu64,
+                     cpu->cpu_index, lead, window);
+        abort();
+    }
+    /* 保存发放时的全局进度；无 BQL 结算时不读取并发变化的 global。 */
+    cpu->skew_budget_global = global_icount;
     cpu->skew_budget = MIN(UINT16_MAX, window - lead);
     exec_budget_set(cpu, cpu->skew_budget);
 }
@@ -242,9 +251,28 @@ void skew_cpu_prepare(CPUState *cpu)
  */
 void skew_cpu_account(CPUState *cpu)
 {
-    uint64_t executed = cpu->skew_budget - exec_budget_remaining(cpu);
+    uint32_t remaining = exec_budget_remaining(cpu);
+    uint64_t executed, local, lead;
 
-    assert(executed <= cpu->skew_budget);
+    /* 不依赖 assert，关闭断言的构建也拒绝损坏的预算结算。 */
+    if (unlikely(remaining > cpu->skew_budget)) {
+        error_report("skew: CPU %d invalid budget: budget=%u remaining=%u",
+                     cpu->cpu_index, cpu->skew_budget, remaining);
+        abort();
+    }
+    executed = cpu->skew_budget - remaining;
+    local = logical_count(cpu) + executed;
+    lead = local - cpu->skew_budget_global;
+    /* 发布前检查发放时的窗口，避免协调器推进 global 掩盖越界。 */
+    if (unlikely(lead > window)) {
+        error_report("skew: CPU %d execution window exceeded: "
+                     "local=%" PRIu64 " grant_global=%" PRIu64
+                     " lead=%" PRIu64 " window=%" PRIu64
+                     " budget=%u remaining=%u",
+                     cpu->cpu_index, local, cpu->skew_budget_global,
+                     lead, window, cpu->skew_budget, remaining);
+        abort();
+    }
     /* Publish only completed instructions, including TB unwind corrections. */
     qatomic_set_u64(&cpu->skew_raw_icount,
                     qatomic_read_u64(&cpu->skew_raw_icount) + executed);

@@ -64,3 +64,19 @@ WSL2 Ubuntu 20.04，GCC 10.5，AArch64 GCC 9.4，QEMU `-O2`、调试断言、
 645 个子测试全部通过。日志保存在 `build/no-quantum-build.log`、
 `build/no-quantum-acceptance/`、`build/no-quantum-acceptance.log` 和
 `build/no-quantum-regression.log`。
+
+
+## 执行窗口越界检测
+
+预算发放前检查 `lead <= window`，结算时检查剩余额度不大于发放额度，
+并在发布 raw 计数前检查本地进度没有超过发放时的 global 加 window。
+这些检查通过报错并终止进程实现，不依赖 assert 是否启用。
+诊断包含 CPU 编号、进度、窗口及预算信息。
+
+每个 CPU 保存一份发放时的 global 快照。结算在无 BQL 的路径中使用该快照，
+避免读取并发更新的 global，也避免 global 前进掩盖本轮越界。
+正常路径只增加常数次整数运算和比较，不增加锁、不扫描其他 CPU，
+不在逐指令或逐 TB 路径上增加检查；尚未单独测量吞吐开销。
+
+该检测验证现有计数和预算所反映的进度；如果底层执行漏记了指令，
+仍需独立指令计数测试发现，不能靠此检查检测未被记录的执行量。

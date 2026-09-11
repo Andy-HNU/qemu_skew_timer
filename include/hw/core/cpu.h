@@ -517,6 +517,8 @@ struct CPUState {
     uint64_t skew_raw_icount;
     /* skew 本轮发放的额度；与 icount_budget/icount_extra 完全独立。 */
     uint32_t skew_budget;
+    /* 发放预算时的 global 快照，用于无锁结算中的窗口越界检测。 */
+    uint64_t skew_budget_global;
     /* 本次加入时的 raw 快照，用于扣除先前执行历史。 */
     uint64_t skew_raw_base;
     /* 本次加入时对齐的全局进度；logical = base + raw - raw_base。 */
