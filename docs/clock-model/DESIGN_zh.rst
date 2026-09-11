@@ -603,70 +603,144 @@ Timer 调度逻辑继续复用 QEMU 主干已有实现。
 Idle Time Warp
 ~~~~~~~~~~~~~~
 
-当所有 vCPU 都退出 active 集合时：
+全 idle 时先提交已完成的执行尾部
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+存在 active vCPU 时，全局进度仍按 active 集合的最小逻辑进度推进。
+因达到 skew 上限而等待的 vCPU 仍属于 active 集合，不能作为全 idle 处理。
+
+当 active 集合为空、且所有 CPU 线程确实 idle 时，先提交已经执行完成、
+但可能尚未反映到 global 的最后一段进度，再考虑 Timer 跳时。
+主线程持有 BQL 扫描所有 CPU，在同一次扫描中分别维护：
 
 .. code-block:: c
 
-    active_cpu_count == 0
+    uint64_t candidate = UINT64_MAX;
+    uint64_t completed = global_icount;
+    unsigned active = 0;
 
-此时：
+    CPU_FOREACH(cpu) {
+        uint64_t raw = atomic_read(&cpu->raw_icount);
+        uint64_t local = cpu->logical_base + raw - cpu->raw_base;
+
+        completed = MAX(completed, local);
+        if (cpu->active) {
+            candidate = MIN(candidate, local);
+            active++;
+        }
+    }
+
+    if (active) {
+        global_icount = MAX(global_icount, candidate);
+    } else if (all_cpu_threads_idle()) {
+        global_icount = completed;
+    }
+
+以上字段名沿用本文的概念命名；实现中的对应字段带 ``skew_`` 前缀。
+``completed`` 从旧 global 开始取最大值，因此尾部提交也不会使 global 倒退。
+全 idle 时没有有效的 active 最小值，``candidate`` 仍为初始哨兵值，不能直接使用。
+
+这里选择最大 ``completed``，是明确的执行尾部提交策略，不表示正常运行时
+由最快 CPU 控制全局时钟。全 idle 时已经没有正在执行的 active 成员，
+此时提交所有 CPU 已完成的最大逻辑进度；有 active 成员时仍然取最小值。
+
+例如，最后完成量为：
 
 .. code-block:: text
 
-    raw_icount 不再增加
-        ->
-    global_icount 不再增加
-        ->
-    QEMU_CLOCK_VIRTUAL 不再推进
+    进入全 idle 前：global = 100，CPU0 logical = 120，CPU1 logical = 100
+    提交执行尾部： global = completed = 120
+    恢复并对齐后： CPU0 logical = 120，CPU1 logical = 120
 
-如果此时 Guest 正在等待 Generic Timer 或设备 Timer IRQ，虚拟时间将无法自然到达 Timer deadline。
+如果改为取所有 CPU 最后逻辑进度的最小值 100，随后仍让各核对齐到 global，
+CPU0 的内部逻辑进度就会从 120 回到 100，已完成的领先部分被重新映射掉。
+正常滑窗约束成立时，这种由领先部分引起的回退最多为一个 skew 窗口，
+不一定恰好等于一个窗口。它不是 raw 指令数减少，也不是软件可见的 global
+时间倒退，而是 CPU 的内部逻辑进度发生回退。
 
-因此只有在 all WFI / all idle 场景下，需要查询当前 ``QEMU_CLOCK_VIRTUAL`` 最近的 Timer deadline。
+采用最大 ``completed`` 后，针对这次全 idle 转换，各 CPU 重新对齐的起点
+不低于其最后已完成的逻辑进度，既提交了执行尾部，也避免了上述向后对齐。
+这不是唯一可定义的时间策略，但它是本方案采用的策略。
 
-QEMU 已有接口可以获取距离最近虚拟 Timer 到期还剩多少时间，例如：
+恢复对齐与尾部提交分别解决什么问题
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: c
-
-    deadline_ns =
-        qemu_clock_deadline_ns_all(
-            QEMU_CLOCK_VIRTUAL,
-            QEMU_TIMER_ATTR_ALL);
-
-如果：
-
-.. code-block:: c
-
-    deadline_ns >= 0
-
-则将虚拟时间推进到该 deadline。
-
-概念上：
+CPU 重新加入 active 集合时，不论由 Timer IRQ 还是其他事件唤醒，
+都重新建立逻辑进度基准：
 
 .. code-block:: c
 
-    virtual_time_ns += deadline_ns;
+    raw_base = atomic_read(&cpu->raw_icount);
+    logical_base = global_icount;
 
-随后仍然由 QEMU 原有 Timer 子系统发现 Timer 到期、执行 callback，并通过 IRQ 等方式唤醒对应 vCPU。
+    // 刚加入时 raw_icount - raw_base == 0
+    logical_icount = logical_base + raw_icount - raw_base;
 
-因此 Idle Time Warp 新增的职责只有：
+raw 是累计实际完成指令数，重新对齐不增加或清零 raw。
+之后每执行一条新指令，logical 才在新的基准上增加一条。
 
-.. code-block:: text
+对齐主要解决的是 CPU 休眠期间离开同步集合、恢复时不必补执行历史欠账的问题，
+并不是因为取了 ``completed`` 才需要对齐。例如 CPU1 在 logical=100 时 idle，
+CPU0 继续运行并将 global 推进到 1000；CPU1 恢复后若从 100 自然运行，
+就需要另行处理 local 落后于 global 的状态。直接取最小值会造成 global 回退，
+仅保持 global 单调又可能让它等待慢核追赶；现有无符号领先量计算也不能直接套用。
 
-    1. 判断所有参与时间推进的 CPU 是否都已 idle
-    2. 获取最近 QEMU_CLOCK_VIRTUAL Timer deadline
-    3. 将虚拟时间推进到该 deadline
+因此，“全 idle 时取最小值，恢复时不对齐”属于另一套时间模型，不能仅替换
+``MAX`` 为 ``MIN`` 就实现。尾部提交决定全 idle 时是否将最后完成量反映到
+global；恢复对齐决定退出同步集合的 CPU 如何重新加入。两项规则相互配合，
+但并不是逻辑上必须同时采用的唯一组合。
 
-Timer 到期处理本身不新增实现。
+提交尾部后再处理 Timer 跳时
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-CPU 被 Timer IRQ 唤醒并重新加入 active 集合时，重新建立 logical icount 基准：
+尾部提交后先将新的 global 换算为统一虚拟时间，再查询最近的虚拟 Timer。
+若此后仍全 idle，raw 不再增加，正常的指令驱动时间也就不再持续增长。
+Guest 等待未来 Generic Timer 或设备 Timer IRQ 时，需要 Idle Time Warp：
 
 .. code-block:: c
 
-    raw_base =
-        atomic_read(&cpu->raw_icount);
+    virtual_time_ns = warp_ns
+        + muldiv64(global_icount, NANOSECONDS_PER_SECOND, SIM_IPS);
 
-    logical_base =
-        global_icount;
+    deadline_ns = qemu_clock_deadline_ns_all(
+        QEMU_CLOCK_VIRTUAL, QEMU_TIMER_ATTR_ALL);
+
+    if (deadline_ns > 0) {
+        warp_ns += deadline_ns;
+        virtual_time_ns += deadline_ns;
+    }
+
+``warp_ns`` 累计空闲跳时偏移，保证后续正常指令时间换算保留此前的跳时结果。
+跳时不伪造 raw 指令数，也不要求恢复的 CPU 执行指令去追赶跳时偏移。
+``deadline_ns == 0`` 时 Timer 已到期，只需通知既有 Timer 子系统处理；
+无 Timer 时不凭空增加时间。
+
+处理顺序为：
+
+1. 确认 VM 正在运行、active 集合为空且所有 CPU 线程确实 idle。
+2. 将 global 推进到 ``completed``，提交最后完成的执行尾部。
+3. 发布由新 global 和已有 ``warp_ns`` 换算得到的虚拟时间。
+4. 查询最近虚拟 Timer，必要时累加跳时偏移并通知 Timer 子系统。
+5. CPU 被唤醒后重新对齐基准，按新增 raw 指令继续推进。
+
+VM 暂停不是 Idle Time Warp 场景；暂停期间不提交时间推进，也不跳到 Timer。
+Timer callback、Generic Timer、设备 Timer 和 IRQ 投递仍复用 QEMU 既有实现。
+
+软件可见时间与内部逻辑进度
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+软件读取的 ARM CNTPCT/CNTVCT 来自统一全局虚拟时钟，而非各 CPU 的
+``logical_icount``；CNTVCT 仍遵循原有虚拟计数器偏移语义。
+重新设置某个 CPU 的 ``logical_base`` 本身不会让软件时钟再跳一次，
+软件看到的是休眠期间全局时间已经推进的结果。
+
+例如 CPU1 在 WFI 前读到时间 100，全 idle 尾部提交或其他核运行后，
+全局时间推进到 120；CPU1 唤醒后读到的是 120 或更大。
+休眠前设置的 deadline 可能在醒来时已经到期，跨 WFI 的时间差包含等待时间，
+不能直接当作该 CPU 实际执行指令所花的时间。
+
+这符合本方案的统一系统时钟语义，但推进量由模拟指令进度、执行尾部提交和
+Timer 跳时决定，不等于宿主实际经过的墙钟时间。
 
 
 方案遗留问题
