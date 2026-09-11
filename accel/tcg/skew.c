@@ -19,10 +19,10 @@
 /* 模式开关只在初始化成功后置位；运行中的时钟更新由协调器负责。 */
 bool use_skew;
 /*
- * sim_ips 的单位是指令/秒；window 和 quantum 是指令数。
+ * sim_ips 的单位是指令/秒；window 是允许领先的指令数。
  * update_interval 是宿主轮询纳秒数，不是虚拟时间步长或中断延迟保证。
  */
-static uint64_t sim_ips, window, quantum, update_interval;
+static uint64_t sim_ips, window, update_interval;
 /* 全局逻辑进度单调不减，由持有 BQL 的协调器独占写入。 */
 static uint64_t global_icount;
 /* 跨线程原子读取的统一虚拟时间，等于指令换算时间加空闲跳时偏移。 */
@@ -180,14 +180,10 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, Error **errp)
                    "skew-ips must be in 1..1000000000000");
         return false;
     }
-    /*
-     * 纳秒窗口转成指令预算，向下取整；每轮 quantum 最多 65535 条，
-     * 对应 TCG 的 16 位低半部递减器，不使用额外预算。
-     */
+    /* 只有滑窗需要换算成指令数；宿主轮询间隔不参与执行预算计算。 */
     window = muldiv64(ns, ips, NANOSECONDS_PER_SECOND);
-    quantum = MIN(65535, muldiv64(update_ns, ips, NANOSECONDS_PER_SECOND));
-    if (!window || !quantum) {
-        error_setg(errp, "skew and skew-update must each cover an instruction");
+    if (!window) {
+        error_setg(errp, "skew must cover at least one instruction");
         return false;
     }
     /* 在启用前安装迁移阻止器，防止不完整状态被保存或迁移。 */
@@ -233,10 +229,10 @@ void skew_cpu_prepare(CPUState *cpu)
                        cpu->cpu_index, true, cpu->skew_raw_icount,
                        logical_count(cpu), global_icount);
     }
-    /* 领先量不得超过 window；实际预算取单轮上限与剩余窗口中的较小者。 */
+    /* 只受剩余窗口和 TCG 16 位装载上限约束，无独立的执行分段策略。 */
     lead = logical_count(cpu) - global_icount;
     assert(lead <= window);
-    cpu->skew_budget = MIN(quantum, window - lead);
+    cpu->skew_budget = MIN(UINT16_MAX, window - lead);
     exec_budget_set(cpu, cpu->skew_budget);
 }
 

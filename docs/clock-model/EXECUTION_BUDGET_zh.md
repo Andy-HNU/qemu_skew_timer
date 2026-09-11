@@ -8,7 +8,7 @@
 
 | 阶段 | 公共层 | icount | skew |
 | --- | --- | --- | --- |
-| 预算生成 | 提供 16 位额度的装载/读取接口 | `icount_prepare_for_run()` 按定时器/replay 与轮转配额生成长预算 | `skew_cpu_prepare()` 按 quantum 和剩余滑窗生成本轮额度 |
+| 预算生成 | 提供 16 位额度的装载/读取接口 | `icount_prepare_for_run()` 按定时器/replay 与轮转配额生成长预算 | `skew_cpu_prepare()` 按剩余滑窗和 TCG 16 位容量生成本轮额度 |
 | 是否耗尽 | 非计数 TB 例外由 CPU 循环处理，再调用 `exhausted` | 公共额度加私有 `icount_extra` 为零 | 公共额度为零 |
 | TB 到期 | 调用 `expired`，必要时按返回额度截短 TB | 先 `icount_update()`，再从剩余长预算续配 | 保留剩余额度，不发新窗口、不推进全局时间 |
 | 执行后结算 | 保留现有 RR/MTTCG 调度边界 | `icount_process_data()` 更新指令时间和 replay | `skew_cpu_account()` 发布完成量；协调器推进 global time |
@@ -52,3 +52,15 @@ WSL2 Ubuntu 20.04，GCC 10.5，AArch64 GCC 9.4，QEMU `-O2`、调试断言、
 本次本机日志：`build/exec-budget-final-build.log`、
 `build/exec-budget-acceptance.log`、`build/exec-budget-acceptance/results.json`、
 `build/exec-budget-regression.log`。完整 trace/Guest ELF 在验收输出目录中保留。
+
+## 删除 quantum 后的验证
+
+每轮额度改为 `min(UINT16_MAX, window - lead)`，只受剩余窗口和 TCG 容量限制。
+`skew-update` 保留 1..1,000,000,000ns 范围检查，但不再要求对应至少一条指令。
+新增回归使用 IPS=100,000,000、window=100ns、update=1ns：轮询间隔仅相当于
+0.1 条指令，仍成功启动并通过 36/226/36 条精确计数及暂停冻结检查。
+
+重建通过；完整验收增至 48 组，全部通过；预算单测与选定上游回归共 11 组、
+645 个子测试全部通过。日志保存在 `build/no-quantum-build.log`、
+`build/no-quantum-acceptance/`、`build/no-quantum-acceptance.log` 和
+`build/no-quantum-regression.log`。

@@ -505,7 +505,7 @@ vCPU 执行路径只负责增加自身 ``raw_icount``：
 主线程更新时间间隔
 ~~~~~~~~~~~~~~~~~~
 
-主线程更新时间间隔决定 ``global_icount`` 和 ``QEMU_CLOCK_VIRTUAL`` 的普通更新粒度。
+主线程更新时间间隔控制协调器按宿主时间轮询的频率，不是虚拟时钟步长或 Timer 投递延迟的上限。
 
 .. code-block:: c
 
@@ -521,11 +521,6 @@ vCPU 执行路径只负责增加自身 ``raw_icount``：
     TIME_UPDATE_INTERVAL =
         MIN_TIMER_PERIOD / UPDATE_DIV
 
-    UPDATE_ICOUNT =
-        TIME_UPDATE_INTERVAL_NS
-        * SIM_IPS
-        / 1000000000ULL
-
     // 示例：
     //
     // MIN_TIMER_PERIOD = 1ms
@@ -533,9 +528,20 @@ vCPU 执行路径只负责增加自身 ``raw_icount``：
     // SIM_IPS = 2,000,000,000
     //
     // TIME_UPDATE_INTERVAL = 100us
-    // UPDATE_ICOUNT = 200,000 icount
 
-TIME_UPDATE_INTERVAL 只用于控制普通的 global time 更新粒度。
+TIME_UPDATE_INTERVAL 只用于调度主线程协调器，不转换为 vCPU 执行额度。
+本方案不设置独立的 quantum；每次执行前只计算当前剩余滑窗：
+
+.. code-block:: c
+
+    lead = logical_icount - global_icount;
+    budget = MIN(UINT16_MAX, MAX_SKEW_ICOUNT - lead);
+
+``budget`` 是本轮实际装入 TCG 递减器的可执行指令数，不是新的时间参数或同步周期。
+``UINT16_MAX``（65535）仅是现有递减器的容量上限。若因容量上限耗尽而窗口仍有
+余量，结算后可继续装载；只有剩余窗口为零才需要等待 global 推进。
+TB 预算检查和截短机制负责约束整块 TB 与直接链接执行，防止跨越窗口边界。
+改变协调器轮询频率可能影响 global 的发布时间，但不会直接改变预算计算公式。
 
 正常有 CPU 执行时，不使用 Timer deadline 限制 vCPU 的 run budget，也不因为 Timer deadline 强制 vCPU 提前退出 TB。
 

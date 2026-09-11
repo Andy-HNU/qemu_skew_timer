@@ -2,6 +2,8 @@
 
 日期：2026-09-10
 
+后续更新：使用说明已同步删除 quantum；下文原验收与性能数字保留为当时运行的历史记录，新版验证见 `EXECUTION_BUDGET_zh.md`。
+
 ## 结论
 
 已在 `codex/single-qemu-skew-clock` 分支实现单 QEMU、MTTCG 多 vCPU 指令驱动时钟。
@@ -37,7 +39,7 @@
 实现选择及边界：
 
 - 复用 `CF_USE_ICOUNT` 插桩，但不启用原有 `use_icount` 全局模式，因此仍使用 MTTCG。
-- 一段执行最多 `min(65535, UPDATE_ICOUNT, 剩余窗口)` 条指令。段结束后才原子更新 raw，最多落后一个在执行的段；没有额外的 published 计数。主线程读到旧进度只会推迟时钟。
+- 一段执行最多 `min(65535, 剩余窗口)` 条指令。段结束后才原子更新 raw，最多落后一个在执行的段；没有额外的 published 计数。主线程读到旧进度只会推迟时钟。
 - active 与两个基准值由 BQL 保护，避免基准混用。窗口预算也是在 BQL 下取得；Guest 指令在锁外并行执行。
 - 全部核真正空闲时，先提交最后执行尾段的最大逻辑进度，再跳到 Timer deadline。无 Timer 时不凭空增长时间，并将 Host 轮询退避到至少 10ms。
 - `skew-update` 是 Host 协调轮询间隔，不是虚拟时间步长上限；没有用 Timer deadline 限制正常运行的 CPU 预算。
@@ -63,7 +65,7 @@ ninja -C build -j2 qemu-system-aarch64
 ```
 
 `skew` 与 `skew-update` 的单位是 ns；默认关闭 skew，默认 IPS 为 2,000,000,000，默认更新间隔为 100,000ns。
-两个间隔各自允许 1..1,000,000,000ns，且至少对应一条指令；IPS 允许 1..1,000,000,000,000。更新间隔与窗口独立配置。
+两个间隔各自允许 1..1,000,000,000ns；仅窗口需要至少对应一条指令。IPS 允许 1..1,000,000,000,000。更新间隔仅控制宿主轮询，不参与执行预算计算。
 不要同时传入 `-icount`。
 
 验收脚本需要 Python 3、AArch64 GCC/binutils、Host C 编译器及 GLib 开发头文件，Guest 由脚本从源码编译，不需要下载操作系统镜像：

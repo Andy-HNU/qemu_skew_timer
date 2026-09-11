@@ -31,10 +31,12 @@ QEMU 支持 TB 直接链接，多个 TB 可以连续执行而不返回 C 层执�
 SIM_IPS               = 2,000,000,000
 CNTFRQ                 = 62,500,000 Hz
 TIME_UPDATE_INTERVAL   = 100 μs
-UPDATE_ICOUNT          = 200,000
+TCG_BUDGET_CAPACITY    = 65,535
 MAX_TIME_SKEW          = 1 ms
 MAX_SKEW_ICOUNT        = 2,000,000
 ```
+
+`TCG_BUDGET_CAPACITY` 仅表示现有 16 位递减器容量，不是新的同步参数。每轮预算取 `min(65535, 剩余窗口)`；`TIME_UPDATE_INTERVAL` 只决定宿主协调器轮询间隔，不再换算为执行额度。
 
 Host 将两个 vCPU 线程、主线程分别绑定到独立物理核。通过绑核竞争或线程定向限速降低指定 vCPU 的执行速度；另设主线程受压场景。记录实际执行速率，避免把限速配置值当成实际减速倍率。
 

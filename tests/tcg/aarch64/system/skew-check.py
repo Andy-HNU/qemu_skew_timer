@@ -207,7 +207,8 @@ def run_guest(qemu, out, mode, skew=True, trace=False, delay_cpu=None,
 
 
 # 用 GDB 起止断点读取 raw 差值；tiny 强制跨越很小的预算边界。
-def exact_counts(qemu, out, tiny=False):
+def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
+    assert not sub_instruction_update or tiny
     elf = build_guest(out, 9 if tiny else 1)
     symbols = {}
     for row in subprocess.check_output(["aarch64-linux-gnu-nm", str(elf)],
@@ -221,6 +222,11 @@ def exact_counts(qemu, out, tiny=False):
         cmd = command(qemu, elf, smp=1)
         if tiny:
             cmd = command(qemu, elf, smp=1, window=7, update=3)
+        if sub_instruction_update:
+            # 轮询间隔仅相当于 0.1 条指令，不能因此拒绝有效的 10 条指令窗口。
+            # 精确计数同时验证这种配置仍能跨 TB 边界正常执行。
+            cmd = command(qemu, elf, smp=1, ips=100000000,
+                          window=100, update=1)
         cmd += ["-S", "-qmp", f"unix:{qp},server=on,wait=off",
                 "-gdb", f"unix:{gp},server=on,wait=off"]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -262,7 +268,8 @@ def exact_counts(qemu, out, tiny=False):
             qmp.cmd("quit")
             proc.communicate(timeout=10)
             return dict(exact_counts=results, paused_ns=clock, pause_host_ms=250,
-                        tiny_window=tiny)
+                        tiny_window=tiny,
+                        sub_instruction_update=sub_instruction_update)
         finally:
             if proc.poll() is None:
                 proc.kill()
@@ -400,6 +407,7 @@ def main():
 
     save(exact_counts(qemu, args.output))
     save(exact_counts(qemu, args.output, tiny=True))
+    save(exact_counts(qemu, args.output, tiny=True, sub_instruction_update=True))
     save(invalid_options(qemu))
     save(controls(qemu, args.output))
     save(controls(qemu, args.output, idle=True))

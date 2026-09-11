@@ -296,7 +296,10 @@ SRST
         (default 2000000000). ``skew-update`` is the host coordinator polling
         interval in nanoseconds (default 100000); it is not a bound on
         virtual clock steps or timer delivery latency. Both intervals must
-        be at most one second and cover at least one guest instruction.
+        be positive and at most one second. Only ``skew`` must cover at
+        least one guest instruction; ``skew-update`` does not limit the
+        per-vCPU execution budget. Each budget is limited by the remaining
+        lead allowance and the TCG 16-bit decrementer capacity (65535).
         The maximum supported instruction rate is 1000000000000.
 
         All guest CPUs share the minimum active CPU progress as virtual
