@@ -94,88 +94,193 @@ budget = MIN(65535, 100 - 30) = 70
 
 ## 2. TCG loop 中的完整路径
 
-这里的 `thread_fn` 是每个 vCPU 的 `mttcg_cpu_thread_fn()`；
-`cpu_loop` 指它调用的 `cpu_exec_loop()`，不是主线程的事件循环。
+下面按 **skew 已开启、MTTCG 正在运行**画出调用路径。实线表示同一线程内的执行顺序，
+虚线表示两个线程间的数据读取或唤醒。节点中的文件名对应本节末尾的源码入口。
 
 ```mermaid
 flowchart TD
-    subgraph VCPU["每个 vCPU：mttcg_cpu_thread_fn"]
-        A["持有 BQL：skew_cpu_idle<br/>仅在真实空闲或停止时移出 active"]
-        B["qemu_process_cpu_events<br/>处理事件，必要时等待"]
-        C{"cpu_can_run？"}
-        D["skew_cpu_prepare<br/>重新加入时对齐；按剩余 window 发放 budget"]
-        E["释放 BQL<br/>tcg_cpu_exec → cpu_exec → cpu_exec_loop<br/>执行一个或多个 TB"]
-        F{"返回 EXCP_ATOMIC？"}
-        G["cpu_exec_step_atomic<br/>独占重试一条；标记返回码已处理"]
-        H["skew_cpu_account<br/>检查越界、发布完成量、清空 budget"]
-        I["取得 BQL，处理返回码<br/>skew_cpu_wait"]
-        J{"仍 active、可继续运行<br/>且 lead == window？"}
-        K["qemu_cond_wait_bql<br/>释放 BQL 并睡眠；醒来重新取得 BQL"]
-        A --> B --> C
-        C -->|是| D --> E --> F
-        C -->|否：继续线程循环| A
-        F -->|是| G --> H
-        F -->|否| H
-        H --> I --> J
-        J -->|否：继续线程循环| A
-        J -->|是| K --> J
+    subgraph VCPU["每个 vCPU 线程：tcg-accel-ops-mttcg.c / mttcg_cpu_thread_fn()"]
+        START["线程初始化：注册 RCU / TCG<br/>bql_lock()，完成 CPU 线程初始化"]
+        IDLE["skew.c / skew_cpu_idle()<br/>持有 BQL：真实空闲或停止时移出 active"]
+        EVENTS["cpus.c / qemu_process_cpu_events()<br/>处理停止请求和待办工作；空闲时可睡眠"]
+        RUN{"cpus.c / cpu_can_run(cpu)？"}
+        PREP["skew.c / skew_cpu_prepare()<br/>持有 BQL：重新加入时对齐 local 到 global<br/>budget = MIN(65535, window - lead)<br/>exec_budget_set() 装入递减器"]
+        UNLOCK["bql_unlock()<br/>各 vCPU 可并行执行 guest"]
+        CALL["tcg-accel-ops.c / tcg_cpu_exec()<br/>cpu_exec_start() → cpu_exec()"]
+        subgraph EXEC["cpu-exec.c：cpu_exec() → cpu_exec_setjmp() → cpu_exec_loop()"]
+            EXCEPTION{"cpu_handle_exception()<br/>是否返回宿主退出码？"}
+            INTERRUPT{"cpu_handle_interrupt()<br/>处理事件后是否退出内层 TB 循环？<br/>包含 exit_request 和公共预算耗尽判断"}
+            LOOKUP["读取 cflags_next_tb / 当前 cflags<br/>检查断点，tb_lookup()<br/>未命中则 tb_gen_code()"]
+            TB["cpu_loop_exec_tb() → cpu_tb_exec()<br/>进入生成的宿主代码：TB 入口检查、指令体、TB 直连<br/>TB 入口与短 TB 路径详见第 3 节"]
+            RETURN["返回 cpu_loop_exec_tb()<br/>若为 TB_EXIT_REQUESTED：检查外部退出请求<br/>调用 exec_budget_expired()，必要时设置短 TB<br/>返回 cpu_exec_loop()"]
+            EXCEPTION -->|否：继续 guest| INTERRUPT
+            INTERRUPT -->|否| LOOKUP --> TB -->|宿主代码正常返回| RETURN --> INTERRUPT
+            INTERRUPT -->|是| EXCEPTION
+            LOOKUP -->|命中断点| EXCEPTION
+            TB -->|异常经 longjmp 恢复到 cpu_exec_setjmp| EXCEPTION
+        end
+        END["tcg-accel-ops.c / tcg_cpu_exec()<br/>cpu_exec_end()，返回 r"]
+        ATOMIC{"r == EXCP_ATOMIC？"}
+        RETRY["cpu_exec_step_atomic()<br/>独占重试一条指令<br/>r = EXCP_INTERRUPT，避免后续重复处理"]
+        ACCOUNT["skew.c / skew_cpu_account()<br/>检查执行量与窗口越界<br/>原子发布 raw_icount，清空本轮 budget"]
+        LOCK["bql_lock()<br/>switch (r)：处理调试、halt 等返回码"]
+        WAIT{"skew.c / skew_cpu_wait()<br/>lead == window 且满足等待条件？<br/>具体条件见下文"}
+        SLEEP["qemu_cond_wait_bql(cpu->halt_cond)<br/>释放 BQL 并睡眠<br/>被唤醒后重新取得 BQL"]
+        AGAIN{"继续线程循环？<br/>!cpu->unplug 或 cpu_can_run(cpu)"}
+        DESTROY["tcg_cpu_destroy() → bql_unlock()<br/>注销 RCU 通知与线程，返回"]
+        START --> IDLE --> EVENTS --> RUN
+        RUN -->|是| PREP --> UNLOCK --> CALL --> EXCEPTION
+        CALL -->|cpu_handle_halt 直接返回 EXCP_HALTED| END
+        EXCEPTION -->|是| END --> ATOMIC
+        ATOMIC -->|是| RETRY --> ACCOUNT
+        ATOMIC -->|否| ACCOUNT
+        ACCOUNT --> LOCK --> WAIT
+        WAIT -->|是| SLEEP --> WAIT
+        WAIT -->|否| AGAIN
+        RUN -->|否| AGAIN
+        AGAIN -->|是| IDLE
+        AGAIN -->|否| DESTROY
     end
-    subgraph MAIN["QEMU 主线程"]
-        T["REALTIME coordinator 到期<br/>主事件循环持有 BQL 调用 skew_update"]
-        U["采样 raw，推进 global<br/>必要时处理全 idle 跳时"]
-        W["等待者 lead 小于 window 时发信号<br/>timer_mod 安排下一次更新"]
-        T --> U --> W
+    subgraph MAIN["QEMU 主线程：宿主事件循环与 skew 协调器"]
+        MAINLOOP["runstate.c / qemu_main_loop()<br/>反复调用 main_loop_wait()"]
+        POLL["main-loop.c / main_loop_wait()<br/>os_host_main_loop_wait() 等待宿主事件<br/>Linux 轮询期间释放 BQL，返回前重新取得"]
+        TIMERS["qemu-timer.c / qemu_clock_run_all_timers()<br/>运行已到期定时器的回调"]
+        UPDATE["skew.c / skew_update()<br/>REALTIME coordinator 到期后，在持有 BQL 时调用<br/>读取各 CPU 的 raw，计算 local"]
+        GLOBAL["推进 global_icount 并发布虚拟时间<br/>有 active：取活跃 CPU 最小进度，保证不倒退<br/>无 active 且全 idle：提交 completed<br/>全 idle 时再按 VIRTUAL 最近 deadline 跳时"]
+        WAKE["等待者 lead 小于 window 时<br/>qemu_cond_signal(cpu->halt_cond)"]
+        REARM["timer_mod(coordinator, 下一次宿主到期时间)<br/>安排下次更新，回调返回事件循环"]
+        MAINLOOP --> POLL --> TIMERS
+        TIMERS -->|coordinator 到期且 VM 运行| UPDATE --> GLOBAL --> WAKE --> REARM --> MAINLOOP
+        TIMERS -->|本次无需 skew 更新| MAINLOOP
     end
-    H -.->|原子发布 raw| U
-    W -.->|唤醒| K
+    ACCOUNT -.->|发布的 raw 供协调器采样| UPDATE
+    GLOBAL -.->|下一轮读取 global 计算剩余窗口| PREP
+    WAKE -.->|发信号使等待线程有机会恢复| SLEEP
 ```
 
-图中省略线程初始化和热拔出收尾。线程是否继续仍由原有 `unplug/cpu_can_run` 条件决定。
+`skew_cpu_wait()` 的完整等待条件是：CPU 仍为 `active`，没有 `stop`、`halted`，
+VM 正在运行，CPU 工作队列为空，没有 `exit_request`，并且 `local - global_icount == window`。
+每次醒来都会重新检查这些条件；睡眠期间仍属于 active 集合。
+协调器推进 global 后可以唤醒它，停止请求或新的 CPU 工作也可以使它结束等待。
 
-一次 `tcg_cpu_exec()` 可以执行多个 TB，直连 TB 也包含在内。
-预算耗尽、外部退出请求、halt、调试或原子重试等都可能让它提前返回。
-因此 `skew_cpu_wait()` 的频率是**每轮执行返回后**，不是每条指令或每个 TB。
+一次 `tcg_cpu_exec()` 可以执行多个 TB，TB 之间还可以直接跳转。
+**TB 返回 C 循环，不等于返回 vCPU 线程循环**：只有 `tcg_cpu_exec()` 返回之后，
+才执行本轮 `skew_cpu_account()` 和 `skew_cpu_wait()`。三个预算检查位置在第 3 节展开。
+图中省略了 CPU 执行入口/出口的辅助处理；异常的 `longjmp` 路径会先完成清理，再重新进入执行循环。
 
-原子重试原本就在 MTTCG 的 `switch (r)` 中。Skew 把它提前到结算之前，
-让重试使用本轮额度，再统一计数；修改局部返回码避免重复重试，不向 guest 注入中断。
+原子重试原本就在 MTTCG 的 `switch (r)` 中。Skew 将它放到结算之前，
+使重试使用本轮额度并统一计数；局部返回码改为 `EXCP_INTERRUPT`，不向 guest 注入中断。
+
+主线程通过 `timer_mod()` 安排下一次协调器回调，**不会直接调用下一轮 `skew_update()`**。
+BQL 保护 active 集合、global 和等待状态；guest 执行期间已经释放 BQL，
+所以协调器仍需原子读取各 vCPU 发布的 raw。
+
+| 图中源码入口 | 职责 |
+|---|---|
+| [tcg-accel-ops-mttcg.c](../../accel/tcg/tcg-accel-ops-mttcg.c)：`mttcg_cpu_thread_fn()` | 串起事件处理、额度准备、执行、结算、等待与线程退出。 |
+| [tcg-accel-ops.c](../../accel/tcg/tcg-accel-ops.c)：`tcg_cpu_exec()` | 用 `cpu_exec_start/end()` 包围 CPU 执行。 |
+| [cpu-exec.c](../../accel/tcg/cpu-exec.c)：`cpu_exec_loop()`、`cpu_loop_exec_tb()` | 公共异常/中断循环、TB 查找与执行、预算退出处理。 |
+| [skew.c](../../accel/tcg/skew.c)：`skew_cpu_*()`、`skew_update()` | 管理 skew 的额度、执行量、窗口等待和全局时间。 |
+| [cpus.c](../../system/cpus.c)：`qemu_process_cpu_events()`、`cpu_can_run()` | 公共 CPU 事件与运行状态判断。 |
+| [runstate.c](../../system/runstate.c)：`qemu_main_loop()`；[main-loop.c](../../util/main-loop.c)：`main_loop_wait()` | 主线程等待宿主事件并调度定时器。 |
+| [qemu-timer.c](../../util/qemu-timer.c)：`qemu_clock_run_all_timers()` | 检查到期时间并调用定时器回调。 |
 
 ## 3. budget 如何阻止 TB 跑出窗口
 
-下图聚焦普通预算退出路径，省略其他异常处理分支。
+**TB 入口的递减、负值检查和退出代码是 QEMU 原有机制。**
+本次改动让 skew 通过公共 budget 接口使用它，窗口计算、结算和等待由 skew 负责。
+
+下面把“翻译时生成检查”和“运行时执行检查”分开画。
+标号 ①②③ 使用同一份 `remaining`，分别表示整轮耗尽判断、整块容量判断、入口拒绝后的处理。
+图中展示启用预算的普通 TB 路径，其他异常及 `CF_NOIRQ` 特殊路径省略。
+
+### 3.1 翻译阶段：QEMU 在哪里生成入口检查
+
+这一阶段在需要生成 TB 时执行。`gen_tb_start()` 是生成代码的函数，
+它生成的检查指令位于 TB 入口，随这个 TB 的每次运行执行。
 
 ```mermaid
 flowchart TD
-    A["cpu_exec_loop → cpu_handle_interrupt<br/>检查并处理退出与中断事件"]
-    B{"cpu->exit_request 已置位？<br/>请求结束本轮执行"}
-    Q{"正常计数路径：remaining == 0？<br/>cpu_execution_budget_exit_request(cpu)<br/>→ exec_budget_exhausted(cpu)"}
-    C["查找或生成 TB<br/>cpu_loop_exec_tb → cpu_tb_exec"]
-    D{"额度足够，且无外部退出/中断通知？<br/>gen_tb_start() 生成的 TB 入口检查"}
-    E["扣减 TB 指令数并执行"]
-    F{"直接链接下一 TB？"}
-    G["TB_EXIT_REQUESTED<br/>返回 cpu_loop_exec_tb"]
-    H{"有外部退出/中断通知？<br/>cpu_loop_exit_requested(cpu)"}
-    I["exec_budget_expired<br/>派发给 skew_budget_expired"]
-    J["返回当前 remaining<br/>有余量但不足整块时，限制下一 TB 长度"]
-    X["结束本轮 tcg_cpu_exec<br/>返回 thread_fn 结算和检查 window"]
-    A --> B
+    A["cpu-exec.c · cpu_exec_loop()<br/>tb_lookup() 未命中"]
+    B["translate-all.c · tb_gen_code()<br/>从 cflags 的 CF_COUNT_MASK 取指令数上限"]
+    C["translate-all.c · setjmp_gen_code()<br/>调用目标架构的 translate_code 回调"]
+    subgraph TR["translator.c：QEMU 原有的入口检查生成机制"]
+        D["translator_loop()<br/>组织整个 TB 的翻译"]
+        E["gen_tb_start()<br/>生成：读取递减器、减去占位指令数<br/>结果为负时跳到 exitreq_label"]
+        F["translator_loop() → ops->translate_insn()<br/>逐条翻译 guest 指令，累计 num_insns<br/>达到 max_insns 或块结束条件时停止"]
+        G["gen_tb_end()<br/>把占位数替换为实际 num_insns<br/>生成 exitreq_label 的 TB_EXIT_REQUESTED 出口"]
+        D --> E --> F --> G
+    end
+    H["translate-all.c · setjmp_gen_code()<br/>tcg_gen_code() 将 TCG 操作编译为宿主机器码"]
+    A --> B --> C --> D
+    G --> H
+```
+
+入口生成代码的关键位置：
+
+| 源码入口 | 生成什么 |
+|---|---|
+| [gen_tb_start()](../../accel/tcg/translator.c) | `tcg_gen_ld_i32()` 读取递减值；`tcg_gen_sub_i32()` 生成减法；`tcg_gen_brcondi_i32(TCG_COND_LT, ...)` 生成负值跳转。检查通过后才写回剩余额度。 |
+| [gen_tb_end()](../../accel/tcg/translator.c) | `tcg_set_insn_param()` 填入实际 TB 指令数；`tcg_gen_exit_tb(tb, TB_EXIT_REQUESTED)` 生成返回 C 执行路径的出口。 |
+
+### 3.2 执行阶段：从 vCPU 线程到 TB，再返回 C 循环
+
+图中的标签用于区分职责：**原有**为 QEMU 原有执行机制，**公共适配**为预算接口接入，
+**skew**为本时间模型的实现；同一个函数可以保留原有流程并调用新接口。
+
+```mermaid
+flowchart TD
+    ENTRY["tcg-accel-ops-mttcg.c · mttcg_cpu_thread_fn()<br/>skew_cpu_prepare() 发放预算，随后释放 BQL"]
+    CALL["tcg-accel-ops.c · tcg_cpu_exec()<br/>→ cpu-exec.c · cpu_exec() → cpu_exec_loop()"]
+    subgraph CPU["cpu-exec.c：C 执行循环"]
+        A["cpu_handle_interrupt()<br/>处理通知并检查本轮退出条件"]
+        B{"cpu->exit_request 已置位？"}
+        Q{"① 本轮剩余额度为 0？［公共适配］<br/>cpu_execution_budget_exit_request()<br/>→ exec_budget_exhausted()<br/>→ skew_budget_exhausted()"}
+        C["tb_lookup()；未命中则 tb_gen_code()<br/>cpu_loop_exec_tb() → cpu_tb_exec()<br/>进入 TB 宿主机器码［原有］"]
+        H{"cpu_loop_exec_tb() 收到 TB_EXIT_REQUESTED<br/>cpu_loop_exit_requested() 为真？<br/>即：有外部退出/中断通知［原有］"}
+        I["③ 处理入口报告的整块额度不足［公共适配］<br/>cpu_loop_exec_tb() → exec_budget_expired()<br/>→ skew_budget_expired()：返回 remaining"]
+        J["cpu_loop_exec_tb()［原有的长度限制流程］<br/>有余量：写 cflags_next_tb 限制下一 TB 长度<br/>零余量：回到①结束本轮"]
+    end
+    subgraph TB["TB 宿主机器码：执行 3.1 生成的代码"]
+        D{"② 够执行整个目标 TB，且无退出通知？［原有］<br/>入口试算：32 位递减值减去 TB 指令数<br/>结果非负？"}
+        E["写回扣减值，执行 guest 指令体"]
+        F{"直接链接下一个 TB？"}
+        G["跳到 exitreq_label，返回 TB_EXIT_REQUESTED<br/>当前目标 TB 的指令体尚未执行"]
+    end
+    X["返回 mttcg_cpu_thread_fn()［skew］<br/>必要的原子重试后 skew_cpu_account()<br/>取得 BQL，再由 skew_cpu_wait() 检查滑窗"]
+    ENTRY --> CALL --> A --> B
     B -->|是| X
     B -->|否| Q
     Q -->|是| X
     Q -->|否| C --> D
     D -->|是| E --> F
-    F -->|是| D
-    F -->|否| A
+    F -->|是：直接进入下一 TB 的入口| D
+    F -->|否：返回 C 循环| A
     D -->|否| G --> H
-    H -->|是| A
-    H -->|否| I --> J --> A
+    H -->|是：先处理事件| A
+    H -->|否：处理额度不足| I --> J --> A
 ```
+
+`cpu_loop_exit_requested()` 位于 [cpu-common.h](../../include/exec/cpu-common.h)；
+`exec_budget_*()` 位于 [exec-budget.h](../../include/exec/exec-budget.h)；
+`skew_budget_*()` 位于 [skew.c](../../accel/tcg/skew.c)。
+
+| 标号 | 关注的问题 | 剩余 3 条、目标 TB 为 10 条时 |
+|---|---|---|
+| ① 整轮耗尽判断 | remaining 是否已经为 0？ | 还有 3 条，继续尝试执行。 |
+| ② 整块容量判断 | remaining 能否容纳目标 TB 的全部指令？ | 3 小于 10，入口返回，目标 TB 指令体尚未执行。 |
+| ③ 不足后的处理 | 如何利用入口返回时剩下的额度？ | 回调返回 3，公共层把下一 TB 长度限制为 3 条。 |
+
+③ 是对②返回结果的处理。执行完这 3 条后，后续入口检查或返回 C 循环，
+最终由①发现 remaining 为 0，结束本轮。TB 直连可以直接进入下一 TB 的②，
+只有返回 C 执行循环时才再次经过①。
 
 图中两个“退出”层次分别是：
 
 | 图中条件 | 代码接口与判断 | 成立后的动作 |
 |---|---|---|
 | `cpu->exit_request` 已置位 | `cpu_handle_interrupt()` 使用 `qatomic_load_acquire(&cpu->exit_request)` 读取 | 请求结束本轮 `tcg_cpu_exec()`，返回 vCPU 线程处理。 |
-| 正常计数路径的 remaining 为 0 | `cpu_execution_budget_exit_request()` → `exec_budget_exhausted()` → `skew_budget_exhausted()` | 额度用完，结束本轮，随后 account 结算、wait 检查窗口。 |
+| 本轮剩余预算为 0（remaining == 0） | `cpu_execution_budget_exit_request()` → `exec_budget_exhausted()` → `skew_budget_exhausted()` | 额度用完，结束本轮，随后 account 结算、wait 检查窗口。 |
 | 有外部退出/中断通知 | `cpu_loop_exec_tb()` 调用 `cpu_loop_exit_requested()`，检查递减器 32 位值的符号位 | 先离开 TB 执行链，回到 `cpu_handle_interrupt()` 处理事件；处理后可能继续执行。 |
 
 “外部退出/中断通知”用于让正在执行的 CPU 及时检查事件，例如暂停请求、待办工作或中断。
@@ -203,7 +308,7 @@ if (qatomic_load_acquire(&cpu->exit_request) ||
 `gen_tb_end()` 在翻译结束后填入 TB 指令数。普通路径先检查、再写回扣减值，
 TB 直连也经过目标 TB 的入口。特殊 `CF_NOIRQ` 路径由上层保证额度，图中未展开。
 
-剩余 3 条而下一 TB 有 10 条时，公共循环设置 `cflags_next_tb`，限制下一 TB 为 3 条。
+③通过设置 `cflags_next_tb` 限制下一 TB 的长度。
 Skew 的 `expired` 回调不补充额度；remaining 为 0 后，`exhausted` 返回 true，退出本轮。
 异常或提前退出涉及 TB 状态恢复时，[translate-all.c](../../accel/tcg/translate-all.c)
 退还尚未执行的额度，结算使用修正后的 remaining。
