@@ -1,6 +1,7 @@
 # skew / icount 的 host time 基准
 
 该基准比较固定有用计算工作量的宿主墙钟耗时，不使用 guest 时间作为成绩。
+[已完成的 WSL2 对比报告及原始数据](benchmarks/20260914-host/REPORT_zh.md)。
 源文件位于 `tests/tcg/aarch64/system/skew-perf*`；不改动 QEMU 运行机制。
 
 ## 测量边界
@@ -51,13 +52,14 @@ skew 使用 MTTCG、window=1ms、IPS=10^9、update=100us；普通 MTTCG 为辅�
 ```sh
 export PKG_CONFIG_PATH=/home/andy/qemu-build-deps/glib/lib/pkgconfig
 python3.9 tests/tcg/aarch64/system/skew-perf.py \
-  --output build/skew-perf-20260914-v2 --work 720384000 --rounds 7
+  --output build/skew-perf-new --work 720384000 --rounds 7
+python3.9 tests/tcg/aarch64/system/skew-perf-report.py \
+  build/skew-perf-new docs/clock-model/benchmarks/new
 ```
 
 `runs.jsonl` 包含预热和正式样本、完整启动参数、实际工作量与进程总耗时。
-`summary.json` 只汇总正式样本。请使用新的输出目录避免把重复运行混入结果。
+`summary.json` 只汇总正式样本。`environment.txt` 记录环境、构建选项和二进制校验值。请使用新的输出目录避免把重复运行混入结果。
 `--pilot` 可用小工作量验证所有模式及计时/结果校验路径。
-
 
 ## 无 guest 周期定时器的边界
 

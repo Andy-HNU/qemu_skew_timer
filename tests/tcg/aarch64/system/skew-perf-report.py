@@ -62,7 +62,7 @@ def main():
       f"多核场景下 skew 快于 icount，但仍慢于普通 MTTCG。以 6 核为例，skew 耗时为普通 MTTCG 的 **{six['skew']['median']/six['mttcg']['median']:.2f} 倍**；这是该配置下启用时间协调后的整体成本，不代表已定位到某个具体函数的开销。",
       '', '相对 MTTCG 耗时增加 = (median(T_skew) / median(T_MTTCG) - 1) × 100%。此列与相对 icount 的耗时降低使用不同基准。']
     lines+=['','## 全部场景与波动范围','','时间列为 **中位数 [最小, 最大]**，单位秒。每行不同模式的有用工作量相同。', '',
-      '| 场景 | vCPU | icount | skew | 普通 MTTCG | 加速比 | 耗时降低 |',
+      '| 场景 | vCPU | icount | skew | 普通 MTTCG | 相对 icount 加速比 | 相对 icount 耗时降低 |',
       '|---|---:|---:|---:|---:|---:|---:|']
     for r in summary:
         def fmt(m):
