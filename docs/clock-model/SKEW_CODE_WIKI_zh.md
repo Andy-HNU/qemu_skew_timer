@@ -145,26 +145,58 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["cpu_exec_loop：cpu_handle_interrupt<br/>汇聚外部请求与预算耗尽条件"]
-    B{"本轮需要退出？"}
+    A["cpu_exec_loop → cpu_handle_interrupt<br/>检查并处理退出与中断事件"]
+    B{"cpu->exit_request 已置位？<br/>请求结束本轮执行"}
+    Q{"正常计数路径：remaining == 0？<br/>cpu_execution_budget_exit_request(cpu)<br/>→ exec_budget_exhausted(cpu)"}
     C["查找或生成 TB<br/>cpu_loop_exec_tb → cpu_tb_exec"]
-    D{"普通 TB 入口检查<br/>当前额度足够且没有异步退出？"}
+    D{"额度足够，且无外部退出/中断通知？<br/>gen_tb_start() 生成的 TB 入口检查"}
     E["扣减 TB 指令数并执行"]
     F{"直接链接下一 TB？"}
     G["TB_EXIT_REQUESTED<br/>返回 cpu_loop_exec_tb"]
-    H{"异步退出请求？"}
+    H{"有外部退出/中断通知？<br/>cpu_loop_exit_requested(cpu)"}
     I["exec_budget_expired<br/>派发给 skew_budget_expired"]
     J["返回当前 remaining<br/>有余量但不足整块时，限制下一 TB 长度"]
     X["结束本轮 tcg_cpu_exec<br/>返回 thread_fn 结算和检查 window"]
     A --> B
     B -->|是| X
-    B -->|否| C --> D
+    B -->|否| Q
+    Q -->|是| X
+    Q -->|否| C --> D
     D -->|是| E --> F
     F -->|是| D
     F -->|否| A
     D -->|否| G --> H
     H -->|是| A
     H -->|否| I --> J --> A
+```
+
+图中两个“退出”层次分别是：
+
+| 图中条件 | 代码接口与判断 | 成立后的动作 |
+|---|---|---|
+| `cpu->exit_request` 已置位 | `cpu_handle_interrupt()` 使用 `qatomic_load_acquire(&cpu->exit_request)` 读取 | 请求结束本轮 `tcg_cpu_exec()`，返回 vCPU 线程处理。 |
+| 正常计数路径的 remaining 为 0 | `cpu_execution_budget_exit_request()` → `exec_budget_exhausted()` → `skew_budget_exhausted()` | 额度用完，结束本轮，随后 account 结算、wait 检查窗口。 |
+| 有外部退出/中断通知 | `cpu_loop_exec_tb()` 调用 `cpu_loop_exit_requested()`，检查递减器 32 位值的符号位 | 先离开 TB 执行链，回到 `cpu_handle_interrupt()` 处理事件；处理后可能继续执行。 |
+
+“外部退出/中断通知”用于让正在执行的 CPU 及时检查事件，例如暂停请求、待办工作或中断。
+原代码也称它为异步退出：通知可能来自其他并行线程，预算有余量时也能触发。
+递减器的低 16 位保存 remaining，高 16 位用于这类通知。
+`cpu_loop_exit_requested()` 的具体判断位于 [cpu-common.h](../../include/exec/cpu-common.h)：
+
+```c
+return (int32_t)qatomic_read(&cpu->neg.icount_decr.u32) < 0;
+```
+
+如果这个判断成立，`cpu_loop_exec_tb()` 先返回 C 执行循环处理事件；
+否则才调用 `exec_budget_expired()` 处理预算不足。
+`cpu_handle_interrupt()` 汇聚本轮退出条件的代码是：
+
+```c
+if (qatomic_load_acquire(&cpu->exit_request) ||
+    cpu_execution_budget_exit_request(cpu)) {
+    /* 标记退出原因，并让 CPU 执行循环结束本轮。 */
+    ...
+}
 ```
 
 [translator.c](../../accel/tcg/translator.c) 的 `gen_tb_start()` 生成额度检查，
