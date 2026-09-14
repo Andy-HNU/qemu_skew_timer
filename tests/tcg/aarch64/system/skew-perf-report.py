@@ -45,6 +45,7 @@ def main():
       '- WSL2 Ubuntu 20.04；Intel Core i7-10750H，6 个物理核、12 个逻辑 CPU；guest 为 AArch64 cortex-a57、virt/GICv2、128 MiB RAM。',
       '- QEMU 使用 -O2，保留调试信息与断言；同一个 QEMU 二进制、同一个配置对应的 guest ELF；icount 使用 thread=single、shift=0、sleep=off。',
       '- skew 使用 thread=multi、window=1 ms、IPS=10^9、update=100 μs。普通 MTTCG 为辅助基线。',
+      '- 本报告的普通 QEMU 基线是同一二进制使用 `-accel tcg,thread=multi`，关闭 skew 和 icount；它不是另行编译的未修改上游 QEMU。计时插件及 guest ELF 与其他模式相同。',
       '- 主指标：guest 所有核就绪后 START MMIO 写，到所有核独立完成并校验后，由最后完成核发出的 DONE MMIO 写之间的 CLOCK_MONOTONIC 墙钟时间。两次写由同一插件在宿主侧记时。',
       '- 排除进程启动和 CPU 启动；包含同步、自旋、host 抢占、窗口等待、测量区内首次翻译及结果校验。无 trace、无宿主延迟注入。',
       '- 42 个配置，各一次预热、7 次正式运行：42 次预热 + 294 次正式样本。每次是新 QEMU 进程，预热不保留 TB 缓存。随机交错顺序，固定种子 20260914。',
@@ -52,11 +53,14 @@ def main():
       '- 原计划最快样本约 5 秒，为控制完整矩阵耗时，实际调整为约 1 秒以上，使用 7 次重复及范围呈现波动。',
       '', '## 主测试：固定总工作量','',
       f'总计 {work:,} 次循环，循环体每次 32 条 guest 指令，合计 {work*32:,} 条有用指令；随核数平均分配。控制及自旋指令另计，但其耗时包含在成绩内。','',
-      '| vCPU | icount 秒 | skew 秒 | 普通 MTTCG 秒 | skew 加速比 | 耗时降低 |',
-      '|---:|---:|---:|---:|---:|---:|']
+      '| vCPU | 普通 MTTCG 秒 | icount 秒 | skew 秒 | 相对 icount 加速比 | 相对 icount 耗时降低 | 相对 MTTCG 耗时增加 |',
+      '|---:|---:|---:|---:|---:|---:|---:|']
     for r in summary:
         if r['scenario']=='total':
-            lines.append(f"| {r['cpus']} | {r['icount']['median']:.3f} | {r['skew']['median']:.3f} | {r['mttcg']['median']:.3f} | {r['speedup']:.2f}× | {r['reduction_percent']:.1f}% |")
+            lines.append(f"| {r['cpus']} | {r['mttcg']['median']:.3f} | {r['icount']['median']:.3f} | {r['skew']['median']:.3f} | {r['speedup']:.2f}× | {r['reduction_percent']:.1f}% | {(r['skew']['median']/r['mttcg']['median']-1)*100:.1f}% |")
+    lines+=['',
+      f"多核场景下 skew 快于 icount，但仍慢于普通 MTTCG。以 6 核为例，skew 耗时为普通 MTTCG 的 **{six['skew']['median']/six['mttcg']['median']:.2f} 倍**；这是该配置下启用时间协调后的整体成本，不代表已定位到某个具体函数的开销。",
+      '', '相对 MTTCG 耗时增加 = (median(T_skew) / median(T_MTTCG) - 1) × 100%。此列与相对 icount 的耗时降低使用不同基准。']
     lines+=['','## 全部场景与波动范围','','时间列为 **中位数 [最小, 最大]**，单位秒。每行不同模式的有用工作量相同。', '',
       '| 场景 | vCPU | icount | skew | 普通 MTTCG | 加速比 | 耗时降低 |',
       '|---|---:|---:|---:|---:|---:|---:|']
