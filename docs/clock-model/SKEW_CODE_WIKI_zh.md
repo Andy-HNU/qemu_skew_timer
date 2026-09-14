@@ -3,13 +3,22 @@
 Skew 在 MTTCG 下限制各 vCPU 的领先量。**TB 消耗 budget，vCPU 线程等待 window，主线程推进 global。**
 本文对应当前实现；详细设计见 [DESIGN_zh.rst](DESIGN_zh.rst)，实测性能见 [文档入口](README.md)。
 
-## 1. 先区分三个量
+## 1. 公式中的量
 
-| 名称 | 含义 | 单位 |
-|---|---|---|
-| `global_icount` | 所有活跃 CPU 共同推进的全局逻辑进度 | 指令 |
-| `window` | CPU 最多可以领先 global 的距离 | 指令 |
-| `skew_budget` | 本轮装入 TCG 的执行额度 | 指令 |
+以下公式针对一个 vCPU。进度、差值和额度都以**指令数**表示，不是纳秒。
+`raw_icount` 是代码中 `cpu->skew_raw_icount` 的简写；`budget` 对应 `cpu->skew_budget`。
+
+| 量 | 含义与更新时机 |
+|---|---|
+| `raw_icount` | 该 CPU 累计完成并已结算的指令数。account 时增加，重新加入 active 集合时不清零；尚未结算的执行量不在其中。 |
+| `skew_raw_base` | 该 CPU 本次加入 active 集合时保存的 raw 快照，用来扣除此前执行的历史。 |
+| `skew_logical_base` | 本次加入时保存的 global，作为这段活跃期的逻辑起点。与 raw_base 配对更新，不随每次发放预算变化。 |
+| `local` | 该 CPU 当前已发布的逻辑进度：逻辑起点加上本次活跃期已结算的指令增量。它不是该 CPU 的累计 raw，也不是 guest 时间寄存器值。 |
+| `global_icount` | 所有 CPU 共用的全局逻辑进度，由主线程的 `skew_update()` 推进；不是各 CPU 指令数之和。正常取活跃成员最小进度，全 idle 时提交已完成尾部，均不倒退。 |
+| `lead` | 该 CPU 的 local 比当前 global 领先多少条指令。prepare 时要求 `0 <= lead <= window`。 |
+| `window` | 允许领先 global 的最大指令数，初始化时由命令行的窗口纳秒值与 IPS 换算得到。 |
+| `UINT16_MAX` | 常量 65,535：底层 16 位执行额度一次能装载的最大值，不是新的调度参数。 |
+| `budget` | prepare 为本轮发放的指令额度，装入 TCG 递减器。`skew_budget` 保存发放值，实际执行时递减的是 remaining，供 account 计算本轮完成量。 |
 
 ```c
 local  = skew_logical_base + raw_icount - skew_raw_base;
@@ -17,11 +26,24 @@ lead   = local - global_icount;
 budget = MIN(UINT16_MAX, window - lead);
 ```
 
+三步分别表示：**把 raw 增量映射到共同逻辑进度 → 算出领先量 → 发放剩余窗口内的额度**。
+`MIN` 取两者较小值；`window - lead` 是当前剩余窗口。
+
+例如，某 CPU 加入时保存 `skew_raw_base=1000`、`skew_logical_base=5000`。
+后来它已结算到 `raw_icount=1080`，协调器已把 `global_icount` 推进到 5050，且 `window=100`：
+
+```text
+local  = 5000 + (1080 - 1000) = 5080
+lead   = 5080 - 5050         = 30
+budget = MIN(65535, 100 - 30) = 70
+```
+
+它累计 raw 为 1080，但本次活跃期只增加了 80 条；现在领先 global 30 条，
+所以本轮最多再执行 70 条。若执行期间 global 不再前进，额度用完就到窗口边界。
+若剩余窗口超过 65,535 条，则分批装载预算，批次用完不一定需要睡眠。
+
 命令行 `skew` 以纳秒给出，初始化时换算成 `window`；`skew-ips` 决定换算比例。
 `skew-update` 只决定宿主协调频率，不参与预算生成。当前没有 quantum。
-
-例如 window=100、lead=30，本轮最多执行 70 条；若 window 剩余 100 万条，
-本轮仍最多装载 65,535 条。后者用完后可以继续领预算，不必睡眠。
 
 ## 2. TCG loop 中的完整路径
 
