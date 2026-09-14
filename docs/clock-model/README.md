@@ -1,5 +1,10 @@
 # Skew clock 文档
 
+## 代码导读
+
+[Skew 代码 Wiki](SKEW_CODE_WIKI_zh.md)：TCG loop 流程图、budget/window、
+`skew.c` 和 icount 公共预算适配。
+
 ## 性能报告
 
 [WSL2 host time 对比报告（2026-09-14）](benchmarks/20260914-host/REPORT_zh.md)
