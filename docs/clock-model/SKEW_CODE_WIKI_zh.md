@@ -3,22 +3,73 @@
 Skew 在 MTTCG 下限制各 vCPU 的领先量。**TB 消耗 budget，vCPU 线程等待 window，主线程推进 global。**
 本文对应当前实现；详细设计见 [DESIGN_zh.rst](DESIGN_zh.rst)，实测性能见 [文档入口](README.md)。
 
-## 1. 公式中的量
+## 1. 从窗口配置到执行额度
 
-以下公式针对一个 vCPU。进度、差值和额度都以**指令数**表示，不是纳秒。
-`raw_icount` 是代码中 `cpu->skew_raw_icount` 的简写；`budget` 对应 `cpu->skew_budget`。
+### 1.1 启动时设置窗口
+
+Skew 通过 QEMU 的 `-accel` 选项配置。下面是启动命令中的加速器参数片段：
+
+```sh
+-accel tcg,thread=multi,skew=1000000,skew-ips=1000000000
+```
+
+| 参数 | 含义 | 示例值 |
+|---|---|---|
+| `thread=multi` | 每个 vCPU 使用独立的 TCG 执行线程 | 开启多线程执行 |
+| `skew` | 允许 vCPU 领先全局虚拟时间的最大时间窗口，单位纳秒 | 1,000,000 ns，即 1 ms |
+| `skew-ips` | 模拟时间的换算速率，单位为指令/模拟秒 | 每 10 亿条指令对应 1 秒模拟时间 |
+
+代码按指令数限制执行，因此 `skew_init()` 把时间窗口换算成指令窗口：
+
+```text
+window = floor(skew × skew-ips / 1,000,000,000)
+       = 1,000,000 条指令              // 上面这组参数
+```
+
+`window` 表示一个 CPU 最多可以领先全局逻辑进度多少条指令。
+随着全局进度前进，允许该 CPU 执行到的位置也向前移动，这就是滑动窗口。
+
+### 1.2 一轮执行与 budget
+
+每个 vCPU 线程反复执行“分配额度 → 执行 guest 代码 → 结算完成量”。
+本文把这个过程称为**一轮执行**，代码对应：
+
+```text
+skew_cpu_prepare() → tcg_cpu_exec() → skew_cpu_account()
+```
+
+`budget` 是这一轮允许执行的指令数。TCG 用递减器保存剩余额度 `remaining`，
+执行代码时扣减它。一轮可以跨越多个翻译块（TB），也可能因中断或 halt 等提前结束。
+
+当前递减器的额度字段是 `cpu->neg.icount_decr.u16.low`，宽度为 **16 位无符号整数**，
+可表示 0～65,535。因此，一次写入递减器的额度最多为 `UINT16_MAX = 2^16 - 1 = 65,535`。
+这个存储上限与剩余窗口共同决定 budget：
+
+```text
+本轮 budget = MIN(65,535, 当前剩余窗口)
+```
+
+剩余窗口只有 70 条，就发放 70 条；剩余窗口有 100 万条，就先发放 65,535 条。
+后一种情况在本轮结束后重新计算窗口余量，再发放下一轮额度。
+
+### 1.3 如何计算剩余窗口
+
+以下进度、差值和额度均以**指令数**表示。
+`active` 表示 CPU 当前参与全局进度协调；CPU 从空闲恢复执行时重新加入。
+`raw_icount` 是 `cpu->skew_raw_icount` 的简写，`budget` 对应 `cpu->skew_budget`。
 
 | 量 | 含义与更新时机 |
 |---|---|
-| `raw_icount` | 该 CPU 累计完成并已结算的指令数。account 时增加，重新加入 active 集合时不清零；尚未结算的执行量不在其中。 |
-| `skew_raw_base` | 该 CPU 本次加入 active 集合时保存的 raw 快照，用来扣除此前执行的历史。 |
-| `skew_logical_base` | 本次加入时保存的 global，作为这段活跃期的逻辑起点。与 raw_base 配对更新，不随每次发放预算变化。 |
-| `local` | 该 CPU 当前已发布的逻辑进度：逻辑起点加上本次活跃期已结算的指令增量。它不是该 CPU 的累计 raw，也不是 guest 时间寄存器值。 |
-| `global_icount` | 所有 CPU 共用的全局逻辑进度，由主线程的 `skew_update()` 推进；不是各 CPU 指令数之和。正常取活跃成员最小进度，全 idle 时提交已完成尾部，均不倒退。 |
+| `raw_icount` | 该 CPU 累计完成并已结算的指令数，在 account 时增加，跨多次活跃期保留。 |
+| `skew_raw_base` | 该 CPU 本次加入 active 集合时保存的 raw 快照，用来扣除此前的执行历史。 |
+| `skew_logical_base` | 本次加入时保存的 global，作为这段活跃期的逻辑起点；与 raw_base 配对更新。 |
+| `local` | 该 CPU 当前已发布的逻辑进度：逻辑起点加上本次活跃期已结算的指令增量。 |
+| `global_icount` | 所有 CPU 共用的全局逻辑进度，由主线程的 `skew_update()` 推进。正常取活跃成员最小进度，全 idle 时提交已完成尾部，均不倒退。 |
 | `lead` | 该 CPU 的 local 比当前 global 领先多少条指令。prepare 时要求 `0 <= lead <= window`。 |
-| `window` | 允许领先 global 的最大指令数，初始化时由命令行的窗口纳秒值与 IPS 换算得到。 |
-| `UINT16_MAX` | 常量 65,535：底层 16 位执行额度一次能装载的最大值，不是新的调度参数。 |
-| `budget` | prepare 为本轮发放的指令额度，装入 TCG 递减器。`skew_budget` 保存发放值，实际执行时递减的是 remaining，供 account 计算本轮完成量。 |
+| `window` | 初始化时由启动参数换算出的最大领先指令数。 |
+| `UINT16_MAX` | 递减器一次可保存的最大额度：65,535。 |
+| `budget` | prepare 发放并保存在 `skew_budget` 中的本轮额度，同时写入递减器。 |
+| `remaining` | 递减器中的当前剩余额度，执行时减少；account 使用 `budget - remaining` 计算本轮完成量。 |
 
 ```c
 local  = skew_logical_base + raw_icount - skew_raw_base;
@@ -26,11 +77,11 @@ lead   = local - global_icount;
 budget = MIN(UINT16_MAX, window - lead);
 ```
 
-三步分别表示：**把 raw 增量映射到共同逻辑进度 → 算出领先量 → 发放剩余窗口内的额度**。
-`MIN` 取两者较小值；`window - lead` 是当前剩余窗口。
+三步依次得到**逻辑进度、领先量、本轮额度**；`window - lead` 就是当前剩余窗口。
 
-例如，某 CPU 加入时保存 `skew_raw_base=1000`、`skew_logical_base=5000`。
-后来它已结算到 `raw_icount=1080`，协调器已把 `global_icount` 推进到 5050，且 `window=100`：
+用一组较小的数值说明：某 CPU 加入时保存 `skew_raw_base=1000`、
+`skew_logical_base=5000`。后来它已结算到 `raw_icount=1080`，
+全局进度为 `global_icount=5050`，窗口为 `window=100`：
 
 ```text
 local  = 5000 + (1080 - 1000) = 5080
@@ -38,12 +89,8 @@ lead   = 5080 - 5050         = 30
 budget = MIN(65535, 100 - 30) = 70
 ```
 
-它累计 raw 为 1080，但本次活跃期只增加了 80 条；现在领先 global 30 条，
-所以本轮最多再执行 70 条。若执行期间 global 不再前进，额度用完就到窗口边界。
-若剩余窗口超过 65,535 条，则分批装载预算，批次用完不一定需要睡眠。
-
-命令行 `skew` 以纳秒给出，初始化时换算成 `window`；`skew-ips` 决定换算比例。
-`skew-update` 只决定宿主协调频率，不参与预算生成。当前没有 quantum。
+本次活跃期已完成 80 条，当前领先全局 30 条，所以本轮还可执行 70 条。
+若执行期间 global 保持不变，这 70 条执行完后就到达窗口边界，需要等待 global 前进。
 
 ## 2. TCG loop 中的完整路径
 
@@ -172,6 +219,11 @@ account 使用发放时保存的 `skew_budget_global`，既避免无锁读取正
 检测基于现有计数，不能发现底层完全漏记的指令。
 
 ### skew_update：推进共享时间
+
+主线程通过一个宿主定时器周期性调用 `skew_update()`，采样各 CPU 的进度。
+调用间隔由 `-accel` 的 `skew-update` 参数设置，单位为宿主纳秒；例如
+`skew-update=100000` 表示通常在一次回调结束后约 100 μs 安排下一次更新。
+它保存在 `update_interval` 中，用于安排协调回调；执行额度仍由第 1 节的剩余窗口公式计算。
 
 每次回调做五件事：
 
