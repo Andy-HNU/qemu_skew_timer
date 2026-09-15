@@ -6,6 +6,32 @@ from pathlib import Path
 SRC=Path(__file__).resolve().parent
 ROOT=SRC.parents[3]
 NAMES=['total','percpu','barrier','uneven']
+WORKLOADS=NAMES+['phased','memory','idle','mixed']
+
+def workload_plan(scenario,cpus,work,phases=8):
+    """Independent host-side accounting for the staged guest's useful work."""
+    if scenario in NAMES:
+        chunks=128 if scenario=='barrier' else 1
+        if scenario=='percpu': count=cpus*work
+        elif scenario=='uneven': count=(work//(cpus+1))*(cpus+1)
+        else: count=(work//cpus//chunks)*cpus*chunks
+        return dict(compute=count,memory=0,stages=0,wakes=0)
+    kinds=['total','phased','memory','idle'] if scenario=='mixed' else [scenario]
+    allocation=work//len(kinds)//phases
+    result=dict(compute=0,memory=0,stages=phases*len(kinds)*cpus,wakes=0)
+    for kind in kinds:
+        n=allocation//cpus
+        if kind=='phased':
+            for p in range(phases):
+                shares=cpus+3*((cpus+1-(p&1))//2)
+                result['compute']+=allocation//shares*shares
+        elif kind=='memory':
+            result['compute']+=n//2*cpus*phases
+            result['memory']+=(n-n//2)*cpus*phases
+        else:
+            result['compute']+=n*cpus*phases
+            if kind=='idle': result['wakes']+=cpus//2*phases
+    return result
 
 def setup(out):
     out.mkdir(parents=True,exist_ok=True)
@@ -34,27 +60,30 @@ def environment(qemu,out):
         chunks.append('Build options: '+json.dumps(selected))
     (out/'environment.txt').write_text('\n'.join(chunks))
 
-def build(out,scenario,cpus,work,gic=2):
-    elf=out/f'{scenario}-{cpus}-{work}-gic{gic}.elf'
+def build(out,scenario,cpus,work,gic=2,phases=8):
+    elf=out/f'{scenario}-{cpus}-{work}-gic{gic}-p{phases}.elf'
     if not elf.exists():
         subprocess.run(['aarch64-linux-gnu-gcc','-O2','-g','-ffreestanding',
           '-fno-stack-protector','-fno-pie','-no-pie','-nostdlib','-mgeneral-regs-only',
           '-march=armv8-a','-mno-outline-atomics',f'-DCPUS={cpus}',f'-DWORK={work}UL',
-          f'-DSCENARIO={NAMES.index(scenario)}',f'-DAFFINITY_SIZE={8 if gic == 2 else 16}','-Wl,--build-id=none','-T',str(SRC/'skew.ld'),
+          f'-DSCENARIO={WORKLOADS.index(scenario)}',f'-DPHASES={phases}',
+          f'-DAFFINITY_SIZE={8 if gic == 2 else 16}','-Wl,--build-id=none','-T',str(SRC/'skew.ld'),
           str(SRC/'skew-perf-boot.S'),str(SRC/'skew-perf-guest.c'),'-o',str(elf)],check=True)
     nm=subprocess.check_output(['aarch64-linux-gnu-nm',str(elf)],text=True)
     pc=re.search(r'^([0-9a-f]+) T marker_store$',nm,re.M).group(1)
     return elf,pc
 
-def run(qemu,out,plugin,scenario,cpus,work,mode,tag,*,gic=2,timeout=600):
-    elf,pc=build(out,scenario,cpus,work,gic)
+def run(qemu,out,plugin,scenario,cpus,work,mode,tag,*,gic=2,timeout=600,phases=8,ram=128,trace=False):
+    elf,pc=build(out,scenario,cpus,work,gic,phases)
     accel='tcg,thread=single' if mode=='icount' else 'tcg,thread=multi'
     if mode=='skew': accel+=',skew=1000000,skew-ips=1000000000,skew-update=100000'
     cmd=[str(qemu),'-M',f'virt,gic-version={gic}','-cpu','cortex-a57','-accel',accel,
-        '-smp',str(cpus),'-m','128M','-display','none','-serial','none','-monitor','none',
+        '-smp',str(cpus),'-m',f'{ram}M','-display','none','-serial','none','-monitor','none',
         '-semihosting-config','enable=on,target=native','-kernel',str(elf),
         '-plugin',f'{plugin},{pc}']
     if mode=='icount': cmd+=['-icount','shift=0,sleep=off']
+    if trace:
+        cmd+=['-trace',f'enable=skew_cpu,file={out / (scenario+"-"+str(cpus)+"-"+tag+".trace")}']
     start=time.monotonic()
     try:
         r=subprocess.run(cmd,capture_output=True,text=True,timeout=timeout)
@@ -71,13 +100,26 @@ def run(qemu,out,plugin,scenario,cpus,work,mode,tag,*,gic=2,timeout=600):
     log.write_text(text)
     matches=re.findall(r'^HOST_BENCH_NS ([0-9]+)$',text,re.M)
     if r.returncode or len(matches)!=1: raise RuntimeError((cmd,r.returncode,text[-2000:]))
-    chunks=128 if scenario=='barrier' else 1
-    if scenario=='percpu': iterations=cpus*work
-    elif scenario=='uneven': iterations=(work//(cpus+1))*(cpus+1)
-    else: iterations=(work//cpus//chunks)*cpus*chunks
+    ranges=re.findall(r'^HOST_BENCH_RANGE (\d+) (\d+)$',text,re.M)
+    if len(ranges)!=1: raise RuntimeError('missing host interval: '+str(log))
+    begin,end=map(int,ranges[0])
+    if end<=begin or end-begin!=int(matches[0]):
+        raise RuntimeError('invalid host interval: '+str(log))
+    plan=workload_plan(scenario,cpus,work,phases)
+    activity=None
+    if scenario not in NAMES:
+        records=re.findall(r'^GUEST_WORK (\d+) (\d+) (\d+) (\d+) (\d+)$',text,re.M)
+        if len(records)!=1: raise RuntimeError('missing guest work verification: '+str(log))
+        c,m,sleeps,wakes,stages=map(int,records[0])
+        if (c,m,wakes,stages)!=(plan['compute'],plan['memory'],plan['wakes'],plan['stages']) or sleeps<plan['wakes']:
+            raise RuntimeError(('guest work mismatch',records[0],plan,str(log)))
+        activity=dict(compute=c,memory=m,wfi_calls=sleeps,irq_wakes=wakes,stage_visits=stages)
+    iterations=plan['compute']+plan['memory']
     row=dict(scenario=scenario,cpus=cpus,work=work,mode=mode,tag=tag,
         host_seconds=int(matches[0])/1e9,process_seconds=elapsed,
-        useful_iterations=iterations,useful_body_insns=iterations*32,command=cmd)
+        useful_iterations=iterations,useful_body_insns=iterations*32,command=cmd,
+        activity=activity,phases=phases,diagnostic_trace=trace,
+        host_start_ns=begin,host_end_ns=end)
     with (out/'runs.jsonl').open('a') as f: f.write(json.dumps(row)+'\n')
     print(json.dumps({k:row[k] for k in ['scenario','cpus','mode','tag','host_seconds']}),flush=True)
     return row

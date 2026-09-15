@@ -20,6 +20,9 @@ static void mark(unsigned cpu, qemu_plugin_meminfo_t info,
     else if(v.data.u32==2 && state==1) {
         state=2;
         fprintf(stderr,"HOST_BENCH_NS %llu\n",(unsigned long long)(now-start_ns));
+        /* Printed after DONE; align optional trace to the measured interval. */
+        fprintf(stderr,"HOST_BENCH_RANGE %llu %llu\n",
+                (unsigned long long)start_ns,(unsigned long long)now);
     } else abort();
 }
 static void translate(qemu_plugin_id_t id, struct qemu_plugin_tb *tb)

@@ -31,6 +31,23 @@ compute:
     b.ne 1b
     mov x0, x1
     ret
+/* 32 instructions/unit: private 512 KiB strided loads mixed with ALU work. */
+.global memory_compute
+memory_compute:
+    mov x2, #0
+    mov x3, #0
+1:  ldr x4, [x1, x2, lsl #3]
+    add x3, x3, x4
+    add x2, x2, #4093
+    and x2, x2, #65535
+    .rept 13
+    add x4, x4, #1
+    eor x4, x4, x3
+    .endr
+    subs x0, x0, #1
+    b.ne 1b
+    mov x0, x3
+    ret
 /* Only this MMIO store is instrumented by the host timing plugin. */
 marker:
     mov x1, #0x09000000

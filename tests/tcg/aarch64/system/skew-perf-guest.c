@@ -32,6 +32,9 @@ static u64 iterations(unsigned id)
     if (SCENARIO == 3) return WORK/(CPUS+1)*(id==CPUS-1 ? 2 : 1);
     return WORK/CPUS;
 }
+#if SCENARIO >= 4
+#include "skew-perf-workloads.h"
+#endif
 void guest_main(u64 id)
 {
     if (!id) {
@@ -45,6 +48,9 @@ void guest_main(u64 id)
             if (x0) finish(1);
         }
     }
+#if SCENARIO >= 4
+    workload_init(id);
+#endif
     u64 chunks=SCENARIO==2 ? 128 : 1;
     u64 n=iterations(id)/chunks, sum=0;
     if (!n) finish(2);
@@ -54,6 +60,9 @@ void guest_main(u64 id)
         marker(1);
         STORE(go,1);
     } else { while (!LOAD(go)) {} }
+#if SCENARIO >= 4
+    run_workload(id);
+#else
     for (u64 k=1;k<=chunks;k++) {
         sum+=compute(n);
         if (SCENARIO==2) {
@@ -66,8 +75,12 @@ void guest_main(u64 id)
     }
     /* 每核独立校验后加入完成计数，避免 CPU0 收尾自旋污染计算成绩。 */
     if (sum != chunks*fib(30*n+1)) finish(3);
+#endif
     if (__atomic_add_fetch(&finished,1,__ATOMIC_ACQ_REL)==CPUS) {
         marker(2);
+#if SCENARIO >= 4
+        workload_report();
+#endif
         finish(0);
     }
     for (;;) asm volatile("wfi");

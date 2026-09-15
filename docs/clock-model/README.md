@@ -8,7 +8,8 @@
 ## 性能报告
 
 [一键扫描 MTTCG / skew / icount](SKEW_SWEEP_zh.md)：输入最大 vCPU 数，
-自动校准工作量并生成宿主耗时表和趋势图，覆盖超过宿主逻辑 CPU 数的配置。
+自动校准工作量并生成宿主耗时表和趋势图，覆盖均匀计算、阶段性不均衡、计算访存、
+休眠重入四个独立场景及一个混合场景，支持超过宿主逻辑 CPU 数的配置。
 
 [WSL2 host time 对比报告（2026-09-14）](benchmarks/20260914-host/REPORT_zh.md)
 比较普通 MTTCG、icount 与 skew，覆盖 1/2/4/6 vCPU、固定总量、固定每核量、
