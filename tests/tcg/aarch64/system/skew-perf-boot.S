@@ -4,7 +4,11 @@
 _start:
 secondary_start:
     mrs x0, mpidr_el1
+    /* virt encodes groups of AFFINITY_SIZE CPUs in MPIDR Aff1. */
+    ubfx x2, x0, #8, #8
     and x0, x0, #255
+    mov x3, #AFFINITY_SIZE
+    madd x0, x2, x3, x0
     ldr x1, =stacks
     add x1, x1, #4096
     add x1, x1, x0, lsl #12
@@ -36,4 +40,4 @@ marker_store:
 .bss
 .balign 64
 stacks:
-    .skip 32768
+    .skip CPUS * 4096

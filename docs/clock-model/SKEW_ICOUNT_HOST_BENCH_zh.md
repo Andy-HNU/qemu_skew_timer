@@ -4,6 +4,8 @@
 [已完成的 WSL2 对比报告及原始数据](benchmarks/20260914-host/REPORT_zh.md)。
 源文件位于 `tests/tcg/aarch64/system/skew-perf*`；不改动 QEMU 运行机制。
 
+换机器快速扫描 `2, 4, 6, …` 到自定上限，请使用 [一键扫描入口](SKEW_SWEEP_zh.md)。
+
 ## 测量边界
 
 裸机 guest 启动所有 CPU，CPU0 等待 ready，然后向 PL011 UART MMIO 写入 START。

@@ -34,29 +34,37 @@ def environment(qemu,out):
         chunks.append('Build options: '+json.dumps(selected))
     (out/'environment.txt').write_text('\n'.join(chunks))
 
-def build(out,scenario,cpus,work):
-    elf=out/f'{scenario}-{cpus}-{work}.elf'
+def build(out,scenario,cpus,work,gic=2):
+    elf=out/f'{scenario}-{cpus}-{work}-gic{gic}.elf'
     if not elf.exists():
         subprocess.run(['aarch64-linux-gnu-gcc','-O2','-g','-ffreestanding',
           '-fno-stack-protector','-fno-pie','-no-pie','-nostdlib','-mgeneral-regs-only',
           '-march=armv8-a','-mno-outline-atomics',f'-DCPUS={cpus}',f'-DWORK={work}UL',
-          f'-DSCENARIO={NAMES.index(scenario)}','-Wl,--build-id=none','-T',str(SRC/'skew.ld'),
+          f'-DSCENARIO={NAMES.index(scenario)}',f'-DAFFINITY_SIZE={8 if gic == 2 else 16}','-Wl,--build-id=none','-T',str(SRC/'skew.ld'),
           str(SRC/'skew-perf-boot.S'),str(SRC/'skew-perf-guest.c'),'-o',str(elf)],check=True)
     nm=subprocess.check_output(['aarch64-linux-gnu-nm',str(elf)],text=True)
     pc=re.search(r'^([0-9a-f]+) T marker_store$',nm,re.M).group(1)
     return elf,pc
 
-def run(qemu,out,plugin,scenario,cpus,work,mode,tag):
-    elf,pc=build(out,scenario,cpus,work)
+def run(qemu,out,plugin,scenario,cpus,work,mode,tag,*,gic=2,timeout=600):
+    elf,pc=build(out,scenario,cpus,work,gic)
     accel='tcg,thread=single' if mode=='icount' else 'tcg,thread=multi'
     if mode=='skew': accel+=',skew=1000000,skew-ips=1000000000,skew-update=100000'
-    cmd=[str(qemu),'-M','virt,gic-version=2','-cpu','cortex-a57','-accel',accel,
+    cmd=[str(qemu),'-M',f'virt,gic-version={gic}','-cpu','cortex-a57','-accel',accel,
         '-smp',str(cpus),'-m','128M','-display','none','-serial','none','-monitor','none',
         '-semihosting-config','enable=on,target=native','-kernel',str(elf),
         '-plugin',f'{plugin},{pc}']
     if mode=='icount': cmd+=['-icount','shift=0,sleep=off']
     start=time.monotonic()
-    r=subprocess.run(cmd,capture_output=True,text=True,timeout=600)
+    try:
+        r=subprocess.run(cmd,capture_output=True,text=True,timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        # Keep startup errors and the exact command even for an incomplete run.
+        def decode(value):
+            return value.decode(errors='replace') if isinstance(value,bytes) else (value or '')
+        (out/f'{scenario}-{cpus}-{mode}-{tag}.log').write_text(
+            decode(exc.stdout)+decode(exc.stderr)+'\nTIMEOUT\n'+shlex.join(cmd))
+        raise
     elapsed=time.monotonic()-start
     text=r.stdout+r.stderr
     log=out/f'{scenario}-{cpus}-{mode}-{tag}.log'

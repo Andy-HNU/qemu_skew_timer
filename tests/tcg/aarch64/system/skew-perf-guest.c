@@ -6,7 +6,7 @@ extern void marker(u64), secondary_start(void);
 #define LOAD(p) __atomic_load_n(&(p), __ATOMIC_ACQUIRE)
 #define STORE(p,v) __atomic_store_n(&(p),(v),__ATOMIC_RELEASE)
 struct slot { u64 ready, done, result, epoch; char pad[32]; };
-static struct slot slots[8] __attribute__((aligned(64)));
+static struct slot slots[CPUS] __attribute__((aligned(64)));
 static u64 go, phase, finished;
 static void finish(u64 code)
 {
@@ -37,7 +37,8 @@ void guest_main(u64 id)
     if (!id) {
         for (u64 i=1; i<CPUS; i++) {
             register u64 x0 asm("x0")=0xc4000003;
-            register u64 x1 asm("x1")=i;
+            register u64 x1 asm("x1")=((i / AFFINITY_SIZE) << 8) |
+                                      (i % AFFINITY_SIZE);
             register u64 x2 asm("x2")=(u64)secondary_start;
             register u64 x3 asm("x3")=0;
             asm volatile("hvc #0" : "+r"(x0) : "r"(x1),"r"(x2),"r"(x3) : "memory");
