@@ -68,9 +68,27 @@ void skew_register_cpu(CPUState *cpu)
                         skew_read_raw, NULL, NULL, NULL);
 }
 
-/* 读取发布值即可，读者不扫描其他 CPU，也不与协调器争夺 BQL。 */
+/*
+ * 实验性本地读时钟：vCPU 在持有 BQL 的 I/O 指令边界读取时，
+ * 将已结算的本地进度与本轮预算消耗相加；不发布到全局协调时钟。
+ * ARM 计数器读指令结束 TB，因此这里的预算差不会包含后续指令。
+ * 主线程及其他上下文仍读取协调器发布的全局时间。
+ */
 int64_t skew_get_clock(void)
 {
+    CPUState *cpu = current_cpu;
+
+    if (cpu && cpu->running && cpu->neg.can_do_io && bql_locked() &&
+        cpu->skew_active) {
+        uint32_t remaining = exec_budget_remaining(cpu);
+        uint64_t local;
+
+        assert(remaining <= cpu->skew_budget);
+        local = cpu->skew_logical_base +
+                (qatomic_read_u64(&cpu->skew_raw_icount) - cpu->skew_raw_base) +
+                (cpu->skew_budget - remaining);
+        return warp_ns + muldiv64(local, NANOSECONDS_PER_SECOND, sim_ips);
+    }
     return qatomic_read_i64(&virtual_ns);
 }
 
