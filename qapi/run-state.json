@@ -779,6 +779,9 @@
 # @global-icount: Global progress in the current skew stage.
 # @window-insns: Window size converted to instructions.
 # @cpus: Live published CPU progress and scheduling state.
+# @model-ns: Strict global-icount based time in skew mode.
+# @visible-bias-ns: Visible time minus model time.
+# @visible-slope-q32: Current interpolation slope in unsigned Q32.
 #
 # The two elapsed fields sum to virtual-ns.
 #
@@ -790,7 +793,8 @@
             'ips': 'uint64', 'update-ns': 'uint64',
             'mttcg-elapsed-ns': 'int', 'skew-elapsed-ns': 'int',
             'global-icount': 'uint64', 'window-insns': 'uint64',
-            'cpus': [ 'SkewCpuInfo' ] },
+            'cpus': [ 'SkewCpuInfo' ], 'model-ns': 'int',
+            'visible-bias-ns': 'int', 'visible-slope-q32': 'uint64' },
   'if': 'CONFIG_TCG' }
 
 ##

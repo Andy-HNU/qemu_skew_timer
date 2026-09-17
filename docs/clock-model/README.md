@@ -33,6 +33,7 @@
 
 ## 设计与功能验收
 
+- [持续 skew 的可见时间动量插值与 jitterentropy 实测](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)
 - [MTTCG / skew 双向 QMP 切换：Linux /init 实测](SKEW_QMP_zh.md)
 - [时钟模型设计](DESIGN_zh.rst)
 - [公共执行预算与机制隔离](EXECUTION_BUDGET_zh.md)

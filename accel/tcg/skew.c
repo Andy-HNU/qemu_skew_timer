@@ -35,6 +35,24 @@ static uint64_t global_icount;
 /* 两种模式累计贡献的纳秒数；MTTCG 当前阶段增量在读取时补入。 */
 static aligned_int64_t mttcg_elapsed_ns, skew_elapsed_ns;
 static aligned_int64_t mttcg_start_clock;
+/*
+ * 软件可见时间在协调周期之间按历史 global 进度插值。斜率采用 Q32 定点数，
+ * 避免在时钟热路径使用浮点；8 个样本按 beta=3/4 指数衰减。
+ */
+#define SKEW_MOMENTUM_HISTORY 8
+#define SKEW_SLOPE_SHIFT 32
+#define SKEW_SLOPE_ONE (1ULL << SKEW_SLOPE_SHIFT)
+#define SKEW_BETA_NUM 3
+#define SKEW_BETA_DEN 4
+#define SKEW_FEEDBACK_NUM 1
+#define SKEW_FEEDBACK_DEN 100
+#define SKEW_ACTIVE_SLOPE_FLOOR (SKEW_SLOPE_ONE / 256)
+static aligned_int64_t model_ns, visible_ns;
+static aligned_int64_t anchor_visible_ns, last_update_elapsed_ns;
+static aligned_uint64_t visible_slope_q32;
+static uint64_t prev_global_icount;
+static uint64_t momentum_history_slope[SKEW_MOMENTUM_HISTORY];
+static unsigned momentum_history_pos, momentum_history_count;
 /* BQL 串行化写者；切换时读者必须看到同一组模式、累计量和基准。 */
 static QemuSeqLock clock_seqlock;
 /* 全 CPU 空闲时累加的跳时偏移，不伪造任何 CPU 的已执行指令数。 */
@@ -43,6 +61,15 @@ static int64_t warp_ns;
 static QEMUTimer *coordinator;
 /* 当前计数、基准和协调器状态没有迁移协议，因此明确禁止迁移/快照。 */
 static Error *migration_blocker;
+
+static uint64_t skew_ratio_q32(uint64_t numerator, uint64_t denominator)
+{
+    if (!denominator) {
+        return 0;
+    }
+    return MIN(((__uint128_t)numerator << SKEW_SLOPE_SHIFT) / denominator,
+               SKEW_SLOPE_ONE);
+}
 
 /* QOM getter 通过原子时钟读取接口返回纳秒值，不触发时间推进。 */
 static void skew_read_clock(Object *obj, Visitor *v, const char *name,
@@ -78,6 +105,34 @@ void skew_register_cpu(CPUState *cpu)
 }
 
 /* 全部 CPU 和设备共用同一时间线；切换前使用可随 VM 暂停的原生时钟。 */
+static int64_t skew_visible_clock(void)
+{
+    int64_t anchor, elapsed_anchor, model, predicted, lower, upper, old, next;
+    uint64_t slope;
+    unsigned seq;
+
+    do {
+        seq = seqlock_read_begin(&clock_seqlock);
+        anchor = qatomic_read_i64(&anchor_visible_ns);
+        elapsed_anchor = qatomic_read_i64(&last_update_elapsed_ns);
+        model = qatomic_read_i64(&model_ns);
+        slope = qatomic_read_u64(&visible_slope_q32);
+        predicted = anchor +
+                    (((__uint128_t)MAX(cpu_get_clock() - elapsed_anchor, 0) *
+                      slope) >> SKEW_SLOPE_SHIFT);
+        lower = MAX(model - (int64_t)window_ns, 0);
+        upper = model + window_ns;
+        predicted = MIN(MAX(predicted, lower), upper);
+    } while (seqlock_read_retry(&clock_seqlock, seq));
+
+    /* 多个 CPU 共同推进一个原子可见时钟，只允许单调增加。 */
+    do {
+        old = qatomic_read_i64(&visible_ns);
+        next = MAX(old, predicted);
+    } while (next != old && qatomic_cmpxchg(&visible_ns, old, next) != old);
+    return next;
+}
+
 int64_t skew_get_clock(void)
 {
     unsigned seq;
@@ -85,9 +140,11 @@ int64_t skew_get_clock(void)
 
     do {
         seq = seqlock_read_begin(&clock_seqlock);
-        now = qatomic_read_i64(&mttcg_elapsed_ns) +
-              qatomic_read_i64(&skew_elapsed_ns);
-        if (!skew_enabled()) {
+        if (skew_enabled()) {
+            now = skew_visible_clock();
+        } else {
+            now = qatomic_read_i64(&mttcg_elapsed_ns) +
+                  qatomic_read_i64(&skew_elapsed_ns);
             now += cpu_get_clock() - qatomic_read_i64(&mttcg_start_clock);
         }
     } while (seqlock_read_retry(&clock_seqlock, seq));
@@ -116,11 +173,23 @@ SkewClockInfo *qmp_query_skew_clock(Error **errp)
     info->window_ns = window_ns;
     info->ips = sim_ips;
     info->update_ns = update_interval;
-    /* 返回值按当前瞬间结算，所以两个 elapsed 字段之和始终等于 virtual。 */
-    info->skew_elapsed_ns = qatomic_read_i64(&skew_elapsed_ns);
-    info->mttcg_elapsed_ns = info->virtual_ns - info->skew_elapsed_ns;
+    /*
+     * 当前模式的 elapsed 包含尚未切换结算的实时增量，另一个模式的
+     * elapsed 已在上次切换时冻结；两者之和始终等于 virtual。
+     */
+    if (skew_enabled()) {
+        info->mttcg_elapsed_ns = qatomic_read_i64(&mttcg_elapsed_ns);
+        info->skew_elapsed_ns = info->virtual_ns - info->mttcg_elapsed_ns;
+    } else {
+        info->skew_elapsed_ns = qatomic_read_i64(&skew_elapsed_ns);
+        info->mttcg_elapsed_ns = info->virtual_ns - info->skew_elapsed_ns;
+    }
     info->global_icount = global_icount;
     info->window_insns = window;
+    info->model_ns = skew_enabled() ? qatomic_read_i64(&model_ns) :
+                     info->virtual_ns;
+    info->visible_bias_ns = info->virtual_ns - info->model_ns;
+    info->visible_slope_q32 = qatomic_read_u64(&visible_slope_q32);
     tail = &info->cpus;
     CPU_FOREACH(cpu) {
         SkewCpuInfo *state = g_new0(SkewCpuInfo, 1);
@@ -148,6 +217,68 @@ static uint64_t logical_count(CPUState *cpu)
            (qatomic_read_u64(&cpu->skew_raw_icount) - cpu->skew_raw_base);
 }
 
+static void skew_momentum_reset(int64_t now)
+{
+    memset(momentum_history_slope, 0, sizeof(momentum_history_slope));
+    momentum_history_pos = 0;
+    momentum_history_count = 0;
+    prev_global_icount = 0;
+    qatomic_set_i64(&model_ns, now);
+    qatomic_set_i64(&visible_ns, now);
+    qatomic_set_i64(&anchor_visible_ns, now);
+    qatomic_set_i64(&last_update_elapsed_ns, cpu_get_clock());
+    qatomic_set_u64(&visible_slope_q32, 0);
+}
+
+static uint64_t skew_momentum_add(uint64_t delta_icount, uint64_t delta_t_ns)
+{
+    __uint128_t weighted = 0;
+    uint64_t period_budget, effective, delta_ns, sample_slope;
+    uint64_t weight = SKEW_SLOPE_ONE, weights = 0;
+    unsigned i, pos;
+
+    if (!delta_t_ns) {
+        return qatomic_read_u64(&visible_slope_q32);
+    }
+    period_budget = muldiv64(sim_ips, delta_t_ns, NANOSECONDS_PER_SECOND);
+    effective = MIN(delta_icount, period_budget);
+    delta_ns = muldiv64(effective, NANOSECONDS_PER_SECOND, sim_ips);
+    sample_slope = skew_ratio_q32(delta_ns, delta_t_ns);
+    momentum_history_slope[momentum_history_pos] = sample_slope;
+    momentum_history_pos = (momentum_history_pos + 1) %
+                           SKEW_MOMENTUM_HISTORY;
+    momentum_history_count = MIN(momentum_history_count + 1,
+                                 SKEW_MOMENTUM_HISTORY);
+
+    pos = momentum_history_pos;
+    for (i = 0; i < momentum_history_count; i++) {
+        pos = (pos + SKEW_MOMENTUM_HISTORY - 1) %
+              SKEW_MOMENTUM_HISTORY;
+        weighted += (__uint128_t)momentum_history_slope[pos] * weight;
+        weights += weight;
+        weight = muldiv64(weight, SKEW_BETA_NUM, SKEW_BETA_DEN);
+    }
+    if (!weights) {
+        return 0;
+    }
+    return weighted / weights;
+}
+
+static uint64_t skew_feedback_slope(uint64_t momentum, int64_t bias,
+                                    uint64_t delta_t_ns)
+{
+    uint64_t correction;
+
+    correction = skew_ratio_q32(bias < 0 ? -bias : bias,
+                                MAX(delta_t_ns, 1));
+    correction = muldiv64(correction, SKEW_FEEDBACK_NUM,
+                          SKEW_FEEDBACK_DEN);
+    if (bias > 0) {
+        return correction >= momentum ? 0 : momentum - correction;
+    }
+    return MIN(momentum + correction, SKEW_SLOPE_ONE);
+}
+
 /* BQL serializes membership, rebasing, and the sole clock writer. */
 /* 协调器周期：采样各 CPU、推进全局时间、处理空闲跳时、唤醒边界等待者。 */
 static void skew_update(void *opaque)
@@ -156,7 +287,9 @@ static void skew_update(void *opaque)
     uint64_t candidate = UINT64_MAX;
     uint64_t completed = global_icount;
     unsigned active = 0;
-    int64_t now, deadline = -1;
+    int64_t now, deadline = -1, visible, lower, upper;
+    uint64_t delta_icount, slope, delta_t_ns;
+    int64_t elapsed_now;
     int64_t old_ns = skew_get_clock();
     int64_t host_ns = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
 
@@ -189,11 +322,9 @@ static void skew_update(void *opaque)
         global_icount = completed;
     }
 
-    /* 用整数乘除把全局指令数换算为纳秒，再叠加空闲跳时偏移。 */
+    /* 严格模型时间仍只由 global 指令进度和空闲跳时决定。 */
     now = start_ns + warp_ns +
           muldiv64(global_icount, NANOSECONDS_PER_SECOND, sim_ips);
-    assert(now >= skew_get_clock());
-    qatomic_set_i64(&skew_elapsed_ns, now - mttcg_elapsed_ns);
 
     /*
 
@@ -206,10 +337,40 @@ static void skew_update(void *opaque)
         if (deadline > 0) {
             warp_ns += deadline;
             now += deadline;
-            qatomic_set_i64(&skew_elapsed_ns, now - mttcg_elapsed_ns);
             trace_skew_warp(host_ns, global_icount, now, deadline);
         }
     }
+
+    /*
+     * 当前周期先结算旧斜率已经对外暴露的时间，再用新 global 样本生成
+     * 下一周期斜率。window 只反馈偏差并施加硬边界，不参与动量输入。
+     */
+    visible = skew_get_clock();
+    elapsed_now = cpu_get_clock();
+    delta_t_ns = MAX(elapsed_now -
+                     qatomic_read_i64(&last_update_elapsed_ns), 0);
+    delta_icount = global_icount - prev_global_icount;
+    prev_global_icount = global_icount;
+    slope = skew_momentum_add(delta_icount, delta_t_ns);
+    slope = skew_feedback_slope(slope, visible - now, delta_t_ns);
+    if (active) {
+        slope = MAX(slope, SKEW_ACTIVE_SLOPE_FLOOR);
+    } else {
+        /* 全空闲只通过既有 deadline warp 推进，不能按宿主时间漂移。 */
+        slope = 0;
+    }
+    lower = MAX(now - (int64_t)window_ns, 0);
+    upper = now + window_ns;
+    visible = MIN(MAX(MAX(visible, lower), qatomic_read_i64(&visible_ns)),
+                  upper);
+    seqlock_write_begin(&clock_seqlock);
+    qatomic_set_i64(&model_ns, now);
+    qatomic_set_i64(&visible_ns, visible);
+    qatomic_set_i64(&anchor_visible_ns, visible);
+    qatomic_set_i64(&last_update_elapsed_ns, elapsed_now);
+    qatomic_set_u64(&visible_slope_q32, slope);
+    qatomic_set_i64(&skew_elapsed_ns, visible - mttcg_elapsed_ns);
+    seqlock_write_end(&clock_seqlock);
     trace_skew_clock(host_ns, global_icount, now, active);
     /* 时间变化或定时器已到期时通知虚拟时钟，促使设备回调得到处理。 */
     if (now != old_ns || deadline == 0) {
@@ -268,6 +429,7 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
     update_interval = update_ns;
     coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);
     qemu_add_vm_change_state_handler(skew_vm_state, NULL);
+    skew_momentum_reset(0);
     qatomic_set(&use_skew, !defer);
     return true;
 }
@@ -307,9 +469,15 @@ static SkewClockInfo *skew_switch(bool enable, Error **errp)
     if (enable) {
         qatomic_set_i64(&mttcg_elapsed_ns,
                        start_ns - qatomic_read_i64(&skew_elapsed_ns));
+        skew_momentum_reset(start_ns);
     } else {
         /* skew_elapsed 已是最终发布值，不把未发布的 CPU 尾部再加进来。 */
+        qatomic_set_i64(&skew_elapsed_ns,
+                        start_ns - qatomic_read_i64(&mttcg_elapsed_ns));
         qatomic_set_i64(&mttcg_start_clock, cpu_get_clock());
+        qatomic_set_i64(&model_ns, start_ns);
+        qatomic_set_i64(&visible_ns, start_ns);
+        qatomic_set_u64(&visible_slope_q32, 0);
     }
     qatomic_set(&use_skew, enable);
     seqlock_write_end(&clock_seqlock);
@@ -371,9 +539,24 @@ void skew_cpu_prepare(CPUState *cpu)
     assert(bql_locked());
     /* 保留累计 raw，以新的 raw_base/logical_base 消除休眠期间的历史落后。 */
     if (!cpu->skew_active) {
+        int64_t visible = skew_get_clock();
+
         cpu->skew_raw_base = qatomic_read_u64(&cpu->skew_raw_icount);
         cpu->skew_logical_base = global_icount;
         cpu->skew_active = true;
+        /*
+         * idle 历史允许动量衰减为零；CPU 恢复执行后立即提供一个小斜率，
+         * 避免在下一次协调样本形成前连续读取相同时间。硬 window 仍限幅。
+         */
+        if (qatomic_read_u64(&visible_slope_q32) <
+            SKEW_ACTIVE_SLOPE_FLOOR) {
+            seqlock_write_begin(&clock_seqlock);
+            qatomic_set_i64(&anchor_visible_ns, visible);
+            qatomic_set_i64(&last_update_elapsed_ns, cpu_get_clock());
+            qatomic_set_u64(&visible_slope_q32,
+                            SKEW_ACTIVE_SLOPE_FLOOR);
+            seqlock_write_end(&clock_seqlock);
+        }
         trace_skew_cpu(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
                        cpu->cpu_index, true, cpu->skew_raw_icount,
                        logical_count(cpu), global_icount);
