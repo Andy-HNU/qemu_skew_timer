@@ -58,6 +58,7 @@ struct TCGState {
     unsigned long tb_size;
     /* 分别保存领先窗口（ns）、模拟指令率（insn/s）、宿主轮询间隔（ns）。 */
     uint64_t skew_ns, skew_ips, skew_update_ns;
+    bool skew_defer;
 };
 typedef struct TCGState TCGState;
 
@@ -74,6 +75,18 @@ bool qemu_tcg_mttcg_enabled(void)
 }
 #endif /* !CONFIG_USER_ONLY */
 
+#ifndef CONFIG_USER_ONLY
+static bool tcg_get_skew_defer(Object *obj, Error **errp)
+{
+    return TCG_STATE(obj)->skew_defer;
+}
+
+static void tcg_set_skew_defer(Object *obj, bool value, Error **errp)
+{
+    TCG_STATE(obj)->skew_defer = value;
+}
+#endif
+
 static void tcg_accel_instance_init(Object *obj)
 {
     TCGState *s = TCG_STATE(obj);
@@ -89,6 +102,8 @@ static void tcg_accel_instance_init(Object *obj)
                                    OBJ_PROP_FLAG_READWRITE);
     object_property_add_uint64_ptr(obj, "skew-update", &s->skew_update_ns,
                                    OBJ_PROP_FLAG_READWRITE);
+    object_property_add_bool(obj, "skew-defer", tcg_get_skew_defer,
+                             tcg_set_skew_defer);
 #endif
     /* If debugging enabled, default "auto on", otherwise off. */
 #if defined(CONFIG_DEBUG_TCG) && !defined(CONFIG_USER_ONLY)
@@ -165,6 +180,10 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
      * 非零窗口才启用；要求明确的 MTTCG 多线程模式，并排除 icount/replay。
      * 初始化成功后注册机器级只读 skew-time，便于 QMP 观测。
      */
+    if (s->skew_defer && !s->skew_ns) {
+        error_report("skew-defer requires a nonzero skew window");
+        return -EINVAL;
+    }
     if (s->skew_ns) {
         if (!mttcg_supported || s->mttcg_enabled != ON_OFF_AUTO_ON ||
             icount_enabled() || replay_mode != REPLAY_MODE_NONE) {
@@ -173,7 +192,7 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
             return -EINVAL;
         }
         if (!skew_init(s->skew_ns, s->skew_ips, s->skew_update_ns,
-                       &error_fatal)) {
+                       s->skew_defer, &error_fatal)) {
             return -EINVAL;
         }
         skew_register_clock(OBJECT(ms));

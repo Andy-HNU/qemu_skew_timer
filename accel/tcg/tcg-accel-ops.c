@@ -216,7 +216,7 @@ static void tcg_accel_ops_init(AccelClass *ac)
         ops->kick_vcpu_thread = tcg_kick_vcpu_thread;
         ops->handle_interrupt = tcg_handle_interrupt;
         /* 统一虚拟纳秒时钟与 elapsed ticks 来源，使设备计时跟随 skew 进度。 */
-        if (skew_enabled()) {
+        if (skew_configured()) {
             ops->get_virtual_clock = skew_get_clock;
             ops->get_elapsed_ticks = skew_get_clock;
         }

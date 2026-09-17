@@ -10,24 +10,33 @@
 #include "qemu/main-loop.h"
 #include "qemu/timer.h"
 #include "qemu/host-utils.h"
+#include "qemu/seqlock.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
 #include "system/cpus.h"
+#include "system/cpu-timers.h"
 #include "system/runstate.h"
 #include "migration/blocker.h"
+#include "exec/tb-flush.h"
+#include "exec/translation-block.h"
+#include "qapi/qapi-commands-run-state.h"
 #include "trace.h"
 
-/* 模式开关只在初始化成功后置位；运行中的时钟更新由协调器负责。 */
+/* 模式只在初始化或全部停核后改变。 */
 bool use_skew;
 /*
  * sim_ips 的单位是指令/秒；window 是允许领先的指令数。
  * update_interval 是宿主轮询纳秒数，不是虚拟时间步长或中断延迟保证。
  */
-static uint64_t sim_ips, window, update_interval;
-/* 全局逻辑进度单调不减，由持有 BQL 的协调器独占写入。 */
+static uint64_t sim_ips, window, update_interval, window_ns;
+static int64_t start_ns;
+/* 当前 skew 阶段的全局进度单调不减，切换模式时清零。 */
 static uint64_t global_icount;
-/* 跨线程原子读取的统一虚拟时间，等于指令换算时间加空闲跳时偏移。 */
-static aligned_int64_t virtual_ns;
+/* 两种模式累计贡献的纳秒数；MTTCG 当前阶段增量在读取时补入。 */
+static aligned_int64_t mttcg_elapsed_ns, skew_elapsed_ns;
+static aligned_int64_t mttcg_start_clock;
+/* BQL 串行化写者；切换时读者必须看到同一组模式、累计量和基准。 */
+static QemuSeqLock clock_seqlock;
 /* 全 CPU 空闲时累加的跳时偏移，不伪造任何 CPU 的已执行指令数。 */
 static int64_t warp_ns;
 /* 用宿主 REALTIME 调度协调器，避免虚拟时钟停滞时无法唤醒协调逻辑。 */
@@ -68,28 +77,68 @@ void skew_register_cpu(CPUState *cpu)
                         skew_read_raw, NULL, NULL, NULL);
 }
 
-/*
- * 实验性本地读时钟：vCPU 在持有 BQL 的 I/O 指令边界读取时，
- * 将已结算的本地进度与本轮预算消耗相加；不发布到全局协调时钟。
- * ARM 计数器读指令结束 TB，因此这里的预算差不会包含后续指令。
- * 主线程及其他上下文仍读取协调器发布的全局时间。
- */
+/* 全部 CPU 和设备共用同一时间线；切换前使用可随 VM 暂停的原生时钟。 */
 int64_t skew_get_clock(void)
 {
-    CPUState *cpu = current_cpu;
+    unsigned seq;
+    int64_t now;
 
-    if (cpu && cpu->running && cpu->neg.can_do_io && bql_locked() &&
-        cpu->skew_active) {
-        uint32_t remaining = exec_budget_remaining(cpu);
-        uint64_t local;
+    do {
+        seq = seqlock_read_begin(&clock_seqlock);
+        now = qatomic_read_i64(&mttcg_elapsed_ns) +
+              qatomic_read_i64(&skew_elapsed_ns);
+        if (!skew_enabled()) {
+            now += cpu_get_clock() - qatomic_read_i64(&mttcg_start_clock);
+        }
+    } while (seqlock_read_retry(&clock_seqlock, seq));
+    return now;
+}
 
-        assert(remaining <= cpu->skew_budget);
-        local = cpu->skew_logical_base +
-                (qatomic_read_u64(&cpu->skew_raw_icount) - cpu->skew_raw_base) +
-                (cpu->skew_budget - remaining);
-        return warp_ns + muldiv64(local, NANOSECONDS_PER_SECOND, sim_ips);
+bool skew_configured(void)
+{
+    return coordinator != NULL;
+}
+
+SkewClockInfo *qmp_query_skew_clock(Error **errp)
+{
+    SkewClockInfo *info;
+    SkewCpuInfoList **tail;
+    CPUState *cpu;
+
+    if (!skew_configured()) {
+        error_setg(errp, "Configure -accel tcg,thread=multi,skew=NS first");
+        return NULL;
     }
-    return qatomic_read_i64(&virtual_ns);
+    info = g_new0(SkewClockInfo, 1);
+    info->mode = skew_enabled() ? SKEW_CLOCK_MODE_SKEW : SKEW_CLOCK_MODE_MTTCG;
+    info->virtual_ns = skew_get_clock();
+    info->start_ns = start_ns;
+    info->window_ns = window_ns;
+    info->ips = sim_ips;
+    info->update_ns = update_interval;
+    /* 返回值按当前瞬间结算，所以两个 elapsed 字段之和始终等于 virtual。 */
+    info->skew_elapsed_ns = qatomic_read_i64(&skew_elapsed_ns);
+    info->mttcg_elapsed_ns = info->virtual_ns - info->skew_elapsed_ns;
+    info->global_icount = global_icount;
+    info->window_insns = window;
+    tail = &info->cpus;
+    CPU_FOREACH(cpu) {
+        SkewCpuInfo *state = g_new0(SkewCpuInfo, 1);
+        SkewCpuInfoList *entry = g_new0(SkewCpuInfoList, 1);
+
+        state->cpu_index = cpu->cpu_index;
+        state->raw_icount = qatomic_read_u64(&cpu->skew_raw_icount);
+        state->local_icount = cpu->skew_logical_base +
+                             state->raw_icount - cpu->skew_raw_base;
+        state->active = cpu->skew_active;
+        state->waiting = cpu->skew_waiting;
+        state->halted = qatomic_read(&cpu->halted);
+        state->budget_enabled = exec_budget_enabled(cpu);
+        entry->value = state;
+        *tail = entry;
+        tail = &entry->next;
+    }
+    return info;
 }
 
 /* 把本次活跃期的实际增量映射到共同进度；成员和基准受 BQL 保护。 */
@@ -113,7 +162,7 @@ static void skew_update(void *opaque)
 
     assert(bql_locked());
     /* VM 暂停时不推进时间；运行状态回调会在恢复时重新安排协调器。 */
-    if (!runstate_is_running()) {
+    if (!skew_enabled() || !runstate_is_running()) {
         return;
     }
 
@@ -141,9 +190,10 @@ static void skew_update(void *opaque)
     }
 
     /* 用整数乘除把全局指令数换算为纳秒，再叠加空闲跳时偏移。 */
-    now = warp_ns + muldiv64(global_icount, NANOSECONDS_PER_SECOND, sim_ips);
+    now = start_ns + warp_ns +
+          muldiv64(global_icount, NANOSECONDS_PER_SECOND, sim_ips);
     assert(now >= skew_get_clock());
-    qatomic_set_i64(&virtual_ns, now);
+    qatomic_set_i64(&skew_elapsed_ns, now - mttcg_elapsed_ns);
 
     /*
 
@@ -156,7 +206,7 @@ static void skew_update(void *opaque)
         if (deadline > 0) {
             warp_ns += deadline;
             now += deadline;
-            qatomic_set_i64(&virtual_ns, now);
+            qatomic_set_i64(&skew_elapsed_ns, now - mttcg_elapsed_ns);
             trace_skew_warp(host_ns, global_icount, now, deadline);
         }
     }
@@ -181,7 +231,7 @@ static void skew_update(void *opaque)
 /* 暂停删除宿主定时器，恢复立即安排一次协调，暂停期间虚拟时间冻结。 */
 static void skew_vm_state(void *opaque, bool running, RunState state)
 {
-    if (running) {
+    if (running && skew_enabled()) {
         timer_mod(coordinator, qemu_clock_get_ns(QEMU_CLOCK_REALTIME));
     } else {
         timer_del(coordinator);
@@ -189,7 +239,8 @@ static void skew_vm_state(void *opaque, bool running, RunState state)
 }
 
 /* 验证单位换算和计数范围；失败时不启用 skew。 */
-bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, Error **errp)
+bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
+               Error **errp)
 {
     /* Bound products, signed timer arithmetic, and reject zero budgets. */
     if (!ips || ips > NANOSECONDS_PER_SECOND * 1000ULL ||
@@ -213,11 +264,90 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, Error **errp)
     }
     /* 参数验证完成后建立宿主协调器，并注册 VM 启停生命周期回调。 */
     sim_ips = ips;
+    window_ns = ns;
     update_interval = update_ns;
     coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);
     qemu_add_vm_change_state_handler(skew_vm_state, NULL);
-    use_skew = true;
+    qatomic_set(&use_skew, !defer);
     return true;
+}
+
+/* 双向切换只搬移时间贡献；停核结算后的领先尾部不强行推进共享时间。 */
+static SkewClockInfo *skew_switch(bool enable, Error **errp)
+{
+    CPUState *cpu;
+    bool running;
+    int ret;
+
+    assert(bql_locked());
+    if (!skew_configured()) {
+        error_setg(errp, "Configure -accel tcg,thread=multi,skew=NS first");
+        return NULL;
+    }
+    if (skew_enabled() == enable) {
+        return qmp_query_skew_clock(errp);
+    }
+    running = runstate_is_running();
+    if (!running && !runstate_check(RUN_STATE_PAUSED) &&
+        !runstate_check(RUN_STATE_PRELAUNCH)) {
+        error_setg(errp, "Clock switch requires running, paused or prelaunch state");
+        return NULL;
+    }
+    if (running) {
+        ret = vm_stop(RUN_STATE_PAUSED);
+        if (ret < 0) {
+            error_setg_errno(errp, -ret, "Could not pause VM for clock switch");
+            return NULL;
+        }
+    }
+    /* 两种模式读到的时间均已冻结；保存切换点供新阶段计时。 */
+    start_ns = skew_get_clock();
+    timer_del(coordinator);
+    seqlock_write_begin(&clock_seqlock);
+    if (enable) {
+        qatomic_set_i64(&mttcg_elapsed_ns,
+                       start_ns - qatomic_read_i64(&skew_elapsed_ns));
+    } else {
+        /* skew_elapsed 已是最终发布值，不把未发布的 CPU 尾部再加进来。 */
+        qatomic_set_i64(&mttcg_start_clock, cpu_get_clock());
+    }
+    qatomic_set(&use_skew, enable);
+    seqlock_write_end(&clock_seqlock);
+    warp_ns = 0;
+    global_icount = 0;
+    CPU_FOREACH(cpu) {
+        qatomic_set_u64(&cpu->skew_raw_icount, 0);
+        cpu->skew_raw_base = 0;
+        cpu->skew_logical_base = 0;
+        cpu->skew_budget_global = 0;
+        cpu->skew_budget = 0;
+        cpu->skew_active = false;
+        cpu->skew_waiting = false;
+        exec_budget_set(cpu, 0);
+        cpu->execution_budget_ops = enable ? &skew_budget_ops : NULL;
+        if (enable) {
+            tcg_cflags_set(cpu, CF_USE_ICOUNT);
+        } else {
+            cpu->tcg_cflags &= ~CF_USE_ICOUNT;
+        }
+        cpu->cflags_next_tb = -1;
+    }
+    tb_flush__exclusive_or_serial();
+    qemu_clock_notify(QEMU_CLOCK_VIRTUAL);
+    if (running) {
+        vm_start();
+    }
+    return qmp_query_skew_clock(errp);
+}
+
+SkewClockInfo *qmp_skew_start(Error **errp)
+{
+    return skew_switch(true, errp);
+}
+
+SkewClockInfo *qmp_skew_stop(Error **errp)
+{
+    return skew_switch(false, errp);
 }
 
 /* 只移除停止、WFI 等真实空闲或 VM 停机成员；普通窗口等待仍参与取最小值。 */

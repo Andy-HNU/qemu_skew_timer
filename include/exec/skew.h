@@ -5,7 +5,7 @@
 /* 编译边界：非 TCG 或用户态模拟恒为关闭，避免依赖系统模拟实现。 */
 #ifdef CONFIG_TCG
 extern bool use_skew;
-#define skew_enabled() (use_skew)
+#define skew_enabled() qatomic_read(&use_skew)
 #else
 #define skew_enabled() false
 #endif
@@ -17,9 +17,12 @@ extern bool use_skew;
 #endif
 #endif
 
-/* 初始化参数、协调器和迁移阻止器；成功后才打开模式开关。 */
-bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, Error **errp);
-/* 原子读取协调器发布的统一虚拟纳秒时间。 */
+/* 初始化参数、协调器和迁移阻止器；defer 时等待 QMP 才启用预算。 */
+bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
+               Error **errp);
+/* 已配置但可尚未启用；用于安装时钟路由和观测接口。 */
+bool skew_configured(void);
+/* 统一虚拟纳秒时间：延迟启用期间取原生时钟，启用后取协调器发布值。 */
 int64_t skew_get_clock(void);
 /* 向机器对象注册只读 skew-time 属性。 */
 void skew_register_clock(Object *obj);

@@ -149,7 +149,7 @@ void mttcg_start_vcpu_thread(CPUState *cpu)
 
     g_assert(tcg_enabled());
     tcg_cpu_init_cflags(cpu, current_machine->smp.max_cpus > 1);
-    if (skew_enabled()) {
+    if (skew_configured()) {
         /* 为每个 vCPU 暴露只读原始计数，供 QMP 验证精确指令数。 */
         skew_register_cpu(cpu);
     }

@@ -730,3 +730,108 @@
 ##
 { 'enum': 'NotifyVmexitOption',
   'data': [ 'run', 'internal-error', 'disable' ] }
+
+##
+# @SkewClockMode:
+#
+# @mttcg: Native virtual time with unbudgeted MTTCG execution.
+# @skew: Shared instruction-driven sliding-window time.
+#
+# Since: 10.2
+##
+{ 'enum': 'SkewClockMode', 'data': [ 'mttcg', 'skew' ],
+  'if': 'CONFIG_TCG' }
+
+##
+# @SkewCpuInfo:
+#
+# @cpu-index: CPU index.
+# @raw-icount: Published instructions in this skew stage.
+# @local-icount: Published logical progress in this skew stage.
+# @active: Member of the active skew set.
+# @waiting: Waiting for the skew window to advance.
+# @halted: CPU halted state at sampling time.
+# @budget-enabled: Execution budget callbacks are installed.
+#
+# Live counters exclude the current unpublished execution budget.
+# CPUs may publish while the list is sampled.
+# All stage counters are reset when changing modes.
+#
+# Since: 10.2
+##
+{ 'struct': 'SkewCpuInfo',
+  'data': { 'cpu-index': 'int', 'raw-icount': 'uint64',
+            'local-icount': 'uint64', 'active': 'bool',
+            'waiting': 'bool', 'halted': 'bool', 'budget-enabled': 'bool' },
+  'if': 'CONFIG_TCG' }
+
+##
+# @SkewClockInfo:
+#
+# @mode: Current clock mode.
+# @virtual-ns: Current shared virtual time in nanoseconds.
+# @start-ns: Time at the most recent mode switch (initially zero).
+# @window-ns: Configured skew window in nanoseconds.
+# @ips: Guest instructions per virtual second.
+# @update-ns: Host coordinator interval in nanoseconds.
+# @mttcg-elapsed-ns: Total MTTCG contribution, including this stage.
+# @skew-elapsed-ns: Total skew contribution, including this stage.
+# @global-icount: Global progress in the current skew stage.
+# @window-insns: Window size converted to instructions.
+# @cpus: Live published CPU progress and scheduling state.
+#
+# The two elapsed fields sum to virtual-ns.
+#
+# Since: 10.2
+##
+{ 'struct': 'SkewClockInfo',
+  'data': { 'mode': 'SkewClockMode', 'virtual-ns': 'int',
+            'start-ns': 'int', 'window-ns': 'uint64',
+            'ips': 'uint64', 'update-ns': 'uint64',
+            'mttcg-elapsed-ns': 'int', 'skew-elapsed-ns': 'int',
+            'global-icount': 'uint64', 'window-insns': 'uint64',
+            'cpus': [ 'SkewCpuInfo' ] },
+  'if': 'CONFIG_TCG' }
+
+##
+# @query-skew-clock:
+#
+# Query a clock configured with the TCG skew accelerator properties.
+# Fails if skew was not configured at startup.
+#
+# Since: 10.2
+##
+{ 'command': 'query-skew-clock', 'returns': 'SkewClockInfo',
+  'if': 'CONFIG_TCG' }
+
+##
+# @skew-start:
+#
+# Switch from deferred MTTCG to skew time without changing the visible
+# time at the transition.  All vCPUs are stopped and old TBs flushed.
+# A running VM is resumed; paused and prelaunch VMs remain stopped.
+# STOP and RESUME events are emitted when a running VM is switched.
+# Requires a nonzero TCG skew window.  Use skew-defer=on to boot
+# in MTTCG.
+# Repeated activation is a no-op.  Use skew-stop to switch back.
+# If stopping fails, the command fails and the VM may remain paused.
+#
+# Since: 10.2
+##
+{ 'command': 'skew-start', 'returns': 'SkewClockInfo',
+  'if': 'CONFIG_TCG' }
+
+##
+# @skew-stop:
+#
+# Switch to unbudgeted MTTCG, retaining the published virtual time.
+# Stop vCPUs, settle budgets, reset stage counters and flush TBs.
+# Unpublished leading CPU tails do not advance time.
+# Accumulated time contributions of both modes are preserved.
+# The VM retains its running, paused or prelaunch state on success.
+# Repeated deactivation is a no-op.  See skew-start for stop failures.
+#
+# Since: 10.2
+##
+{ 'command': 'skew-stop', 'returns': 'SkewClockInfo',
+  'if': 'CONFIG_TCG' }

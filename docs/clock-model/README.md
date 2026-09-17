@@ -33,6 +33,7 @@
 
 ## 设计与功能验收
 
+- [MTTCG / skew 双向 QMP 切换：Linux /init 实测](SKEW_QMP_zh.md)
 - [时钟模型设计](DESIGN_zh.rst)
 - [公共执行预算与机制隔离](EXECUTION_BUDGET_zh.md)
 - [功能验收说明](TEST_ACCEPTANCE_zh.md)
