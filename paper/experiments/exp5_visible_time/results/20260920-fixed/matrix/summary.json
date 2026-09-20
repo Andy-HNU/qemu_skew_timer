@@ -1,0 +1,387 @@
+{
+  "sustained-200m": {
+    "baseline": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5786899320009979,
+      "guest_reads": 56000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5873854940000456,
+      "guest_reads": 56000,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "model_equal_fraction": {
+        "median": 0.47380922615326915,
+        "min": 0.45655706963370424,
+        "max": 0.4776847105888236
+      },
+      "visible_delta_variance_ns2": {
+        "median": 43206971244.02437,
+        "min": 39731960460.3153,
+        "max": 43748868595.50617
+      },
+      "model_delta_variance_ns2": {
+        "median": 68341180484.67351,
+        "min": 64616291300.88792,
+        "max": 69176825000.19785
+      },
+      "max_abs_bias_ns": {
+        "median": 1000000,
+        "min": 1000000,
+        "max": 1000000
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 1.0150262887224943
+  },
+  "sustained-2g": {
+    "baseline": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5868843920034124,
+      "guest_reads": 56000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5807806190059637,
+      "guest_reads": 56000,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "model_equal_fraction": {
+        "median": 0.4780597574696837,
+        "min": 0.4711838979872484,
+        "max": 0.4805600700087511
+      },
+      "visible_delta_variance_ns2": {
+        "median": 27105626.34276528,
+        "min": 20499296.91282935,
+        "max": 32373799.21790521
+      },
+      "model_delta_variance_ns2": {
+        "median": 805652433.3353325,
+        "min": 789813236.6674991,
+        "max": 818270083.7608857
+      },
+      "max_abs_bias_ns": {
+        "median": 1000000,
+        "min": 1000000,
+        "max": 1000000
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.9895997012689116
+  },
+  "sustained-20g": {
+    "baseline": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5755513369949767,
+      "guest_reads": 56000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5686846009994042,
+      "guest_reads": 56000,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "model_equal_fraction": {
+        "median": 0.48606075759469936,
+        "min": 0.4646830853856732,
+        "max": 0.4910613826728341
+      },
+      "visible_delta_variance_ns2": {
+        "median": 338087.8261071232,
+        "min": 307968.9553394762,
+        "max": 379219.02971266204
+      },
+      "model_delta_variance_ns2": {
+        "median": 21011653.408458874,
+        "min": 17889484.778380115,
+        "max": 22600902.14780129
+      },
+      "max_abs_bias_ns": {
+        "median": 303709,
+        "min": 265718,
+        "max": 322460
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.9880692901671907
+  },
+  "wide-boundary": {
+    "baseline": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5773798920054105,
+      "guest_reads": 56000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5816858950056485,
+      "guest_reads": 56000,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "model_equal_fraction": {
+        "median": 0.48031003875484435,
+        "min": 0.4624328041005126,
+        "max": 0.48281035129391175
+      },
+      "visible_delta_variance_ns2": {
+        "median": 7812409.75335181,
+        "min": 6037874.7558755195,
+        "max": 10545830.513279717
+      },
+      "model_delta_variance_ns2": {
+        "median": 270479309.70234346,
+        "min": 262213162.7889793,
+        "max": 272458618.90074325
+      },
+      "max_abs_bias_ns": {
+        "median": 1000000,
+        "min": 990647,
+        "max": 1000000
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 1.0074578333257882
+  },
+  "wide-max": {
+    "baseline": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5735399940022035,
+      "guest_reads": 56000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5913246320051257,
+      "guest_reads": 56000,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 46569,
+        "plateau_pairs": 16845,
+        "plateau_observed_host_ns": 1121218342,
+        "bound_hits_positive_stored_slope": 46569
+      },
+      "counter_equal_fraction": {
+        "median": 0.32304038004750596,
+        "min": 0.31116389548693585,
+        "max": 0.3312914114264283
+      },
+      "model_equal_fraction": {
+        "median": 0.4749343667958495,
+        "min": 0.4559319914989374,
+        "max": 0.4783097887235904
+      },
+      "visible_delta_variance_ns2": {
+        "median": 2018.0522798816537,
+        "min": 1921.1995863153352,
+        "max": 2096.49558529483
+      },
+      "model_delta_variance_ns2": {
+        "median": 2845.1661171985793,
+        "min": 2686.4000214366088,
+        "max": 2886.667856828772
+      },
+      "max_abs_bias_ns": {
+        "median": 1000,
+        "min": 1000,
+        "max": 1000
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 1.0310085402742706
+  },
+  "saturation": {
+    "baseline": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.0275236989982659,
+      "guest_reads": 28000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.5515214179977193,
+      "guest_reads": 28000,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 27896,
+        "plateau_pairs": 27889,
+        "plateau_observed_host_ns": 3632810245,
+        "bound_hits_positive_stored_slope": 27896
+      },
+      "counter_equal_fraction": {
+        "median": 0.9959989997499374,
+        "min": 0.9957489372343086,
+        "max": 0.997249312328082
+      },
+      "model_equal_fraction": {
+        "median": 1.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "visible_delta_variance_ns2": {
+        "median": 1071.756797163782,
+        "min": 1014.2385506354083,
+        "max": 2494.5635344820203
+      },
+      "model_delta_variance_ns2": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "max_abs_bias_ns": {
+        "median": 10000,
+        "min": 10000,
+        "max": 10000
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": null
+  },
+  "cross-cpu": {
+    "baseline": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.042028603005746845,
+      "guest_reads": 28000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 7,
+      "passed": 7,
+      "host_seconds_median": 0.044178799995279405,
+      "guest_reads": 28000,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": {
+        "median": 0.08402100525131283,
+        "min": 0.07076769192298074,
+        "max": 0.10177544386096524
+      },
+      "model_equal_fraction": {
+        "median": 0.994498624656164,
+        "min": 0.9929982495623906,
+        "max": 0.9949987496874219
+      },
+      "visible_delta_variance_ns2": {
+        "median": 292461210.2000032,
+        "min": 272309778.7670133,
+        "max": 369871547.1897341
+      },
+      "model_delta_variance_ns2": {
+        "median": 810016730.4955302,
+        "min": 756936935.74447,
+        "max": 968933840.9150612
+      },
+      "max_abs_bias_ns": {
+        "median": 1000000,
+        "min": 1000000,
+        "max": 1000000
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 1.0511603250110062
+  }
+}

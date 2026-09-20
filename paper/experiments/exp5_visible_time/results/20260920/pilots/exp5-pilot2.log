@@ -1,0 +1,29 @@
+steady-baseline--1 PASS 0.037s 
+steady-probe--1 PASS 0.040s 0
+dense-baseline--1 PASS 0.025s 
+dense-probe--1 PASS 0.028s 0
+high-2g-baseline--1 PASS 0.027s 
+high-2g-probe--1 PASS 0.031s 0
+high-20g-baseline--1 PASS 0.024s 
+high-20g-probe--1 PASS 0.030s 0
+saturation-baseline--1 PASS 0.729s 
+saturation-probe--1 PASS 0.743s 0
+cross-cpu-baseline--1 PASS 0.039s 
+cross-cpu-probe--1 PASS 0.043s 0
+burst-baseline--1 PASS 0.046s 
+burst-probe--1 PASS 0.053s 0
+high-2g-probe-0 PASS 0.028s 0
+burst-baseline-0 PASS 0.044s 
+steady-baseline-0 PASS 0.038s 
+saturation-baseline-0 PASS 0.727s 
+dense-probe-0 PASS 0.025s 0
+steady-probe-0 PASS 0.043s 0
+burst-probe-0 PASS 0.064s 0
+high-20g-baseline-0 PASS 0.030s 
+high-20g-probe-0 PASS 0.028s 0
+dense-baseline-0 PASS 0.030s 
+high-2g-baseline-0 PASS 0.032s 
+cross-cpu-probe-0 PASS 0.044s 0
+cross-cpu-baseline-0 PASS 0.041s 
+saturation-probe-0 PASS 0.772s 0
+RESULT 14 / 14

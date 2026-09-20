@@ -1,0 +1,527 @@
+{
+  "experiment": 2,
+  "evidence": "synthetic",
+  "input": "\\\\wsl.localhost\\Ubuntu-20.04\\home\\andy\\qemu_skew_timer\\paper\\experiments\\exp2_host_speed\\example.csv",
+  "rows": 60,
+  "input_sha256": "f7342dcfec4f62e72112fd172f1d532d426a1248bcbe196c60020d27913c8e20",
+  "python_version": "3.12.14",
+  "matplotlib_version": "3.11.2",
+  "error_bars": "min--max; center median; not confidence intervals",
+  "groups": [
+    {
+      "method": "icount",
+      "capacity_pct": 20,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 515000000,
+        "mean": 515000000,
+        "min": 500000000,
+        "max": 530000000,
+        "stddev_sample": 15000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "icount",
+      "capacity_pct": 40,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 257500000,
+        "mean": 257500000,
+        "min": 250000000,
+        "max": 265000000,
+        "stddev_sample": 7500000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "icount",
+      "capacity_pct": 60,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 171666666,
+        "mean": 171666666,
+        "min": 166666666,
+        "max": 176666666,
+        "stddev_sample": 5000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "icount",
+      "capacity_pct": 80,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 128750000,
+        "mean": 128750000,
+        "min": 125000000,
+        "max": 132500000,
+        "stddev_sample": 3750000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "icount",
+      "capacity_pct": 100,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 103000000,
+        "mean": 103000000,
+        "min": 100000000,
+        "max": 106000000,
+        "stddev_sample": 3000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "mttcg",
+      "capacity_pct": 20,
+      "attempts": 3,
+      "completed": 2,
+      "miss_rate": 1,
+      "host_ns": {
+        "n": 2,
+        "median": 507500000.0,
+        "mean": 507500000,
+        "min": 500000000,
+        "max": 515000000,
+        "stddev_sample": 10606601.717798213
+      },
+      "guest_ns": {
+        "n": 2,
+        "median": 502500000.0,
+        "mean": 502500000,
+        "min": 500000000,
+        "max": 505000000,
+        "stddev_sample": 3535533.9059327375
+      },
+      "model_ns": null
+    },
+    {
+      "method": "mttcg",
+      "capacity_pct": 40,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 1,
+      "host_ns": {
+        "n": 3,
+        "median": 257500000,
+        "mean": 257500000,
+        "min": 250000000,
+        "max": 265000000,
+        "stddev_sample": 7500000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 252500000,
+        "mean": 252500000,
+        "min": 250000000,
+        "max": 255000000,
+        "stddev_sample": 2500000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "mttcg",
+      "capacity_pct": 60,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 1,
+      "host_ns": {
+        "n": 3,
+        "median": 171666666,
+        "mean": 171666666,
+        "min": 166666666,
+        "max": 176666666,
+        "stddev_sample": 5000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 168333333,
+        "mean": 168333333,
+        "min": 166666666,
+        "max": 170000000,
+        "stddev_sample": 1666667.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "mttcg",
+      "capacity_pct": 80,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 128750000,
+        "mean": 128750000,
+        "min": 125000000,
+        "max": 132500000,
+        "stddev_sample": 3750000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 126250000,
+        "mean": 126250000,
+        "min": 125000000,
+        "max": 127500000,
+        "stddev_sample": 1250000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "mttcg",
+      "capacity_pct": 100,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 103000000,
+        "mean": 103000000,
+        "min": 100000000,
+        "max": 106000000,
+        "stddev_sample": 3000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "skew",
+      "capacity_pct": 20,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 515000000,
+        "mean": 515000000,
+        "min": 500000000,
+        "max": 530000000,
+        "stddev_sample": 15000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": {
+        "n": 3,
+        "median": 100000000,
+        "mean": 100000000,
+        "min": 100000000,
+        "max": 100000000,
+        "stddev_sample": 0.0
+      }
+    },
+    {
+      "method": "skew",
+      "capacity_pct": 40,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 257500000,
+        "mean": 257500000,
+        "min": 250000000,
+        "max": 265000000,
+        "stddev_sample": 7500000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": {
+        "n": 3,
+        "median": 100000000,
+        "mean": 100000000,
+        "min": 100000000,
+        "max": 100000000,
+        "stddev_sample": 0.0
+      }
+    },
+    {
+      "method": "skew",
+      "capacity_pct": 60,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 171666666,
+        "mean": 171666666,
+        "min": 166666666,
+        "max": 176666666,
+        "stddev_sample": 5000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": {
+        "n": 3,
+        "median": 100000000,
+        "mean": 100000000,
+        "min": 100000000,
+        "max": 100000000,
+        "stddev_sample": 0.0
+      }
+    },
+    {
+      "method": "skew",
+      "capacity_pct": 80,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 128750000,
+        "mean": 128750000,
+        "min": 125000000,
+        "max": 132500000,
+        "stddev_sample": 3750000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": {
+        "n": 3,
+        "median": 100000000,
+        "mean": 100000000,
+        "min": 100000000,
+        "max": 100000000,
+        "stddev_sample": 0.0
+      }
+    },
+    {
+      "method": "skew",
+      "capacity_pct": 100,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 103000000,
+        "mean": 103000000,
+        "min": 100000000,
+        "max": 106000000,
+        "stddev_sample": 3000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 101000000,
+        "mean": 101000000,
+        "min": 100000000,
+        "max": 102000000,
+        "stddev_sample": 1000000.0
+      },
+      "model_ns": {
+        "n": 3,
+        "median": 100000000,
+        "mean": 100000000,
+        "min": 100000000,
+        "max": 100000000,
+        "stddev_sample": 0.0
+      }
+    },
+    {
+      "method": "slowtime",
+      "capacity_pct": 20,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 1,
+      "host_ns": {
+        "n": 3,
+        "median": 515000000,
+        "mean": 515000000,
+        "min": 500000000,
+        "max": 530000000,
+        "stddev_sample": 15000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 252500000,
+        "mean": 252500000,
+        "min": 250000000,
+        "max": 255000000,
+        "stddev_sample": 2500000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "slowtime",
+      "capacity_pct": 40,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 257500000,
+        "mean": 257500000,
+        "min": 250000000,
+        "max": 265000000,
+        "stddev_sample": 7500000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 126250000,
+        "mean": 126250000,
+        "min": 125000000,
+        "max": 127500000,
+        "stddev_sample": 1250000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "slowtime",
+      "capacity_pct": 60,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 171666666,
+        "mean": 171666666,
+        "min": 166666666,
+        "max": 176666666,
+        "stddev_sample": 5000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 84166666,
+        "mean": 84166666.33333333,
+        "min": 83333333,
+        "max": 85000000,
+        "stddev_sample": 833333.50000005
+      },
+      "model_ns": null
+    },
+    {
+      "method": "slowtime",
+      "capacity_pct": 80,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 128750000,
+        "mean": 128750000,
+        "min": 125000000,
+        "max": 132500000,
+        "stddev_sample": 3750000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 63125000,
+        "mean": 63125000,
+        "min": 62500000,
+        "max": 63750000,
+        "stddev_sample": 625000.0
+      },
+      "model_ns": null
+    },
+    {
+      "method": "slowtime",
+      "capacity_pct": 100,
+      "attempts": 3,
+      "completed": 3,
+      "miss_rate": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 103000000,
+        "mean": 103000000,
+        "min": 100000000,
+        "max": 106000000,
+        "stddev_sample": 3000000.0
+      },
+      "guest_ns": {
+        "n": 3,
+        "median": 50500000,
+        "mean": 50500000,
+        "min": 50000000,
+        "max": 51000000,
+        "stddev_sample": 500000.0
+      },
+      "model_ns": null
+    }
+  ]
+}

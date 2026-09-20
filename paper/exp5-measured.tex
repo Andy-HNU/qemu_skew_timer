@@ -1,0 +1,74 @@
+\paragraph{Method.}
+We reused the AArch64 bare-metal boot harness and Linux jitter test. An independent
+experiment binary reused the existing build objects except for copied skew and
+Arm counter-helper sources. The production binary and source were unchanged.
+Counter callbacks recorded actual returned ticks together with the corresponding
+model, visible value and stored slope in a preallocated buffer under the existing
+BQL; the buffer was written at exit. Paired uninstrumented runs checked guest
+counter monotonicity. The host was WSL2 Ubuntu 20.04 on x86-64; the guest counter
+frequency was 62.5 MHz. Full environment and binary hashes are archived.
+
+Eleven scenarios each used one warmup and seven formal runs per binary, yielding
+154 formal executions and 392,000 instrumented counter reads. All guest executions
+completed. Collected counter/visible values had no backward steps or window
+violations, with no dropped or unlocked records. Each returned counter matched
+the recorded visible nanoseconds divided by 16. Two CPUs alternated reads using
+a release/acquire handshake in the cross-CPU scenario.
+
+\paragraph{Repeated reads and saturation.}
+Across seven runs, the median fraction of identical consecutive counter reads
+was 22.181\% in the steady scenario, 94.999\% in the dense scenario and 8.752\%
+with alternating CPUs. For unchanged model values in these same traces, the
+fractions were 99.750\%, 100\% and 99.450\%, respectively. This diagnostic does
+not replace an independently executed ablation with interpolation disabled.
+A frozen model has zero delta variance; that alone does not establish clock quality.
+
+To force saturation, the experiment copy delayed each counter callback by
+100 microseconds while retaining the existing BQL. With 2G IPS, a 10-microsecond
+window and 100-millisecond coordinator interval, 27,699 of 28,000 formal reads
+hit the upper bound; 27,678 adjacent pairs formed observed plateaus at unchanged
+model time. All bound-hit records retained a positive stored slope. This validates
+clamping behavior under explicit fault injection, not natural-workload performance.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=.95\linewidth]{experiments/exp5_visible_time/results/20260920/figures/saturation-onset/E10-visible-timeline.pdf}
+\caption{Measured onset of saturation at 2G IPS. Software counter reads reach the
+10-microsecond upper bound while the model remains fixed. The experiment injects
+a 100-microsecond delay before each read; plotted points are recorded values.}
+\end{figure}
+
+\paragraph{A failed invariant at wide IPS.}
+Sustained 20G-IPS runs failed the configured model-time formula in all seven
+repetitions, although the clock remained bounded and nondecreasing. The QEMU
+\texttt{muldiv64} helper accepts 32-bit multiplier and divisor arguments; passing
+the 64-bit configured IPS truncates values above $2^{32}-1$. A production-binary
+QMP check returned a 2,820,130-instruction window for 20G IPS and a 1ms window,
+rather than 20,000,000. The effective truncated IPS was 2,820,130,816. All 12,099
+nonzero-global samples in the selected sustained run matched this truncated
+conversion and failed the nominal one. Initial 20G saturation runs also failed
+the model formula and remain in the archive; the 2G saturation study above avoids
+that defect. Short 20G traces ending before global progress advanced could not
+detect the formula error. These pre-fix failures remain archived separately.
+
+\paragraph{Wide-IPS correction and regression.}
+A subsequent fix uses 64-bit operands and a 128-bit intermediate for window,
+model-time and momentum conversions, saturating unrepresentable results.
+Eight QMP configurations, including $2^{32}$ and the supported maximum of
+$10^{12}$ IPS, now return the expected window. Forty-four arithmetic cases also
+cover coordinator intervals beyond $2^{32}$ nanoseconds. Seven new scenarios
+with seven formal repetitions per binary passed all 98 executions, including
+sustained 20G IPS, the 32-bit boundary, the supported maximum, saturation and
+cross-CPU reads. The 336,000 instrumented reads had no model-formula,
+counter-conversion, monotonicity or bound violations. This corrects conversion
+width; it does not eliminate saturation plateaus or guarantee entropy quality.
+
+\paragraph{Reuse and limits.}
+Seven formal Linux boots at 2G IPS passed jitter initialization and 256 actual
+64-byte AF\_ALG jitterentropy reads each, with skew enabled from reset. Existing
+quick acceptance tests for pause, idle/IRQ, instruction accounting and CPU control
+also passed. These results do not certify entropy quality or all concurrency
+interleavings. Non-injected probe/baseline process-time ratios were approximately
+1.02--1.06 for short scenarios and 1.00--1.01 for sustained ones, including startup
+and log output; they are not isolated per-read costs. The model-only ablation and
+broader workload validation remain pending.

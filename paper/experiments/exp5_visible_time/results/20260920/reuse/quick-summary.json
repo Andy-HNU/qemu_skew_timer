@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "returncode": 0,
+  "host_seconds": 30.493484745995374,
+  "command": [
+    "python3",
+    "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-check.py",
+    "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+    "--quick",
+    "--output",
+    "/home/andy/qemu_skew_timer/build/exp5-reuse-20260920/quick"
+  ]
+}

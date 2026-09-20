@@ -62,6 +62,16 @@ static QEMUTimer *coordinator;
 /* 当前计数、基准和协调器状态没有迁移协议，因此明确禁止迁移/快照。 */
 static Error *migration_blocker;
 
+/* IPS 和协调间隔均为 64 位；muldiv64() 的后两个参数只有 32 位。 */
+static uint64_t skew_muldiv(uint64_t value, uint64_t multiplier,
+                            uint64_t divisor)
+{
+    __uint128_t result = (__uint128_t)value * multiplier / divisor;
+
+    /* 极长协调间隔的预算饱和，避免溢出后把有效进度错误地截小。 */
+    return MIN(result, UINT64_MAX);
+}
+
 static uint64_t skew_ratio_q32(uint64_t numerator, uint64_t denominator)
 {
     if (!denominator) {
@@ -240,9 +250,9 @@ static uint64_t skew_momentum_add(uint64_t delta_icount, uint64_t delta_t_ns)
     if (!delta_t_ns) {
         return qatomic_read_u64(&visible_slope_q32);
     }
-    period_budget = muldiv64(sim_ips, delta_t_ns, NANOSECONDS_PER_SECOND);
+    period_budget = skew_muldiv(sim_ips, delta_t_ns, NANOSECONDS_PER_SECOND);
     effective = MIN(delta_icount, period_budget);
-    delta_ns = muldiv64(effective, NANOSECONDS_PER_SECOND, sim_ips);
+    delta_ns = skew_muldiv(effective, NANOSECONDS_PER_SECOND, sim_ips);
     sample_slope = skew_ratio_q32(delta_ns, delta_t_ns);
     momentum_history_slope[momentum_history_pos] = sample_slope;
     momentum_history_pos = (momentum_history_pos + 1) %
@@ -324,7 +334,7 @@ static void skew_update(void *opaque)
 
     /* 严格模型时间仍只由 global 指令进度和空闲跳时决定。 */
     now = start_ns + warp_ns +
-          muldiv64(global_icount, NANOSECONDS_PER_SECOND, sim_ips);
+          skew_muldiv(global_icount, NANOSECONDS_PER_SECOND, sim_ips);
 
     /*
 
@@ -412,7 +422,7 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
         return false;
     }
     /* 只有滑窗需要换算成指令数；宿主轮询间隔不参与执行预算计算。 */
-    window = muldiv64(ns, ips, NANOSECONDS_PER_SECOND);
+    window = skew_muldiv(ns, ips, NANOSECONDS_PER_SECOND);
     if (!window) {
         error_setg(errp, "skew must cover at least one instruction");
         return false;

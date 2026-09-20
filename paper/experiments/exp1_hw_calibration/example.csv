@@ -1,0 +1,16 @@
+evidence,source_log,run_id,workload,split,hardware_ns,instructions,selected_ips
+synthetic,synthetic:make_examples.py,example-0,RX,calibration,1000000,180000,200000000
+synthetic,synthetic:make_examples.py,example-1,RX,calibration,1000000,182000,200000000
+synthetic,synthetic:make_examples.py,example-2,RX,calibration,1000000,184000,200000000
+synthetic,synthetic:make_examples.py,example-3,TX,calibration,2000000,380000,200000000
+synthetic,synthetic:make_examples.py,example-4,TX,calibration,2000000,384000,200000000
+synthetic,synthetic:make_examples.py,example-5,TX,calibration,2000000,388000,200000000
+synthetic,synthetic:make_examples.py,example-6,Parsing,calibration,3000000,600000,200000000
+synthetic,synthetic:make_examples.py,example-7,Parsing,calibration,3000000,606000,200000000
+synthetic,synthetic:make_examples.py,example-8,Parsing,calibration,3000000,612000,200000000
+synthetic,synthetic:make_examples.py,example-9,IRQ-task,validation,4000000,840000,200000000
+synthetic,synthetic:make_examples.py,example-10,IRQ-task,validation,4000000,848000,200000000
+synthetic,synthetic:make_examples.py,example-11,IRQ-task,validation,4000000,856000,200000000
+synthetic,synthetic:make_examples.py,example-12,Control,validation,5000000,1100000,200000000
+synthetic,synthetic:make_examples.py,example-13,Control,validation,5000000,1110000,200000000
+synthetic,synthetic:make_examples.py,example-14,Control,validation,5000000,1120000,200000000

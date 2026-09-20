@@ -1,0 +1,1266 @@
+[
+  {
+    "exact_counts": [
+      {
+        "loop": "short_loop",
+        "raw_delta": 64000002,
+        "expected": 64000002
+      },
+      {
+        "loop": "long_loop",
+        "raw_delta": 64000002,
+        "expected": 64000002
+      },
+      {
+        "loop": "long_loop",
+        "raw_delta": 128000002,
+        "expected": 128000002
+      },
+      {
+        "loop": "fault_probe",
+        "raw_delta": 36,
+        "expected": 36
+      }
+    ],
+    "paused_ns": 128111802,
+    "pause_host_ms": 250,
+    "tiny_window": false,
+    "sub_instruction_update": false
+  },
+  {
+    "exact_counts": [
+      {
+        "loop": "short_loop",
+        "raw_delta": 36,
+        "expected": 36
+      },
+      {
+        "loop": "long_loop",
+        "raw_delta": 226,
+        "expected": 226
+      },
+      {
+        "loop": "fault_probe",
+        "raw_delta": 36,
+        "expected": 36
+      }
+    ],
+    "paused_ns": 209,
+    "pause_host_ms": 250,
+    "tiny_window": true,
+    "sub_instruction_update": false
+  },
+  {
+    "exact_counts": [
+      {
+        "loop": "short_loop",
+        "raw_delta": 36,
+        "expected": 36
+      },
+      {
+        "loop": "long_loop",
+        "raw_delta": 226,
+        "expected": 226
+      },
+      {
+        "loop": "fault_probe",
+        "raw_delta": 36,
+        "expected": 36
+      }
+    ],
+    "paused_ns": 4230,
+    "pause_host_ms": 250,
+    "tiny_window": true,
+    "sub_instruction_update": true
+  },
+  {
+    "invalid_configurations_rejected": 6
+  },
+  {
+    "control_cycles": 100,
+    "vcpu_threads": [
+      322710,
+      322711
+    ],
+    "vcpu_runtime_ns": [
+      330480900,
+      304208100
+    ],
+    "sample_wall_ns": 500558809,
+    "parallel_runtime_ratio": 1.2679609040703148,
+    "affinity": [
+      0,
+      1
+    ],
+    "migration_blocked": true,
+    "tlbi_broadcast": true,
+    "external_uart": true
+  },
+  {
+    "all_idle_no_timer": true,
+    "stable_host_ms": 250,
+    "stable_virtual_ns": 39265,
+    "external_irq_wake": true
+  },
+  {
+    "mode": 1,
+    "skew": true,
+    "seconds": 0.23100758899818175,
+    "command": [
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "-M",
+      "virt,gic-version=2",
+      "-cpu",
+      "cortex-a57",
+      "-accel",
+      "tcg,thread=multi,skew=1000000,skew-ips=2000000000,skew-update=100000",
+      "-smp",
+      "1",
+      "-m",
+      "128M",
+      "-display",
+      "none",
+      "-serial",
+      "none",
+      "-monitor",
+      "none",
+      "-semihosting-config",
+      "enable=on,target=native",
+      "-kernel",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/guest-1-1.elf",
+      "-trace",
+      "enable=skew_*",
+      "-D",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/mode1-skew-2.trace",
+      "-trace",
+      "enable=arm_gt_timer_expire"
+    ],
+    "delay_cpu": null,
+    "native_icount": false,
+    "records": [
+      [
+        "FREQ",
+        62500000,
+        1
+      ],
+      [
+        "COUNT_SHORT",
+        64000000,
+        1999548
+      ],
+      [
+        "COUNT_LONG",
+        64000000,
+        1930877
+      ],
+      [
+        "COUNT_LONG",
+        128000000,
+        3980204
+      ]
+    ],
+    "trace": {
+      "updates": 1205,
+      "waits": 2,
+      "warps": 0,
+      "max_step_ns": 1000000,
+      "max_lead_insns": 2000000,
+      "callback_lateness_ns": []
+    }
+  },
+  {
+    "mode": 2,
+    "skew": true,
+    "seconds": 0.057138698000926524,
+    "command": [
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "-M",
+      "virt,gic-version=2",
+      "-cpu",
+      "cortex-a57",
+      "-accel",
+      "tcg,thread=multi,skew=1000000,skew-ips=2000000000,skew-update=100000",
+      "-smp",
+      "2",
+      "-m",
+      "128M",
+      "-display",
+      "none",
+      "-serial",
+      "none",
+      "-monitor",
+      "none",
+      "-semihosting-config",
+      "enable=on,target=native",
+      "-kernel",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/guest-2-1.elf",
+      "-trace",
+      "enable=skew_*",
+      "-D",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/mode2-skew-3.trace",
+      "-trace",
+      "enable=arm_gt_timer_expire"
+    ],
+    "delay_cpu": null,
+    "native_icount": false,
+    "records": [
+      [
+        "FREQ",
+        62500000,
+        2
+      ],
+      [
+        "SMP",
+        1930184,
+        1933548
+      ]
+    ],
+    "trace": {
+      "updates": 121,
+      "waits": 24,
+      "warps": 0,
+      "max_step_ns": 1000000,
+      "max_lead_insns": 2000000,
+      "callback_lateness_ns": []
+    }
+  },
+  {
+    "mode": 3,
+    "skew": true,
+    "seconds": 0.7612475639980403,
+    "command": [
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "-M",
+      "virt,gic-version=2",
+      "-cpu",
+      "cortex-a57",
+      "-accel",
+      "tcg,thread=multi,skew=1000000,skew-ips=2000000000,skew-update=100000",
+      "-smp",
+      "2",
+      "-m",
+      "128M",
+      "-display",
+      "none",
+      "-serial",
+      "none",
+      "-monitor",
+      "none",
+      "-semihosting-config",
+      "enable=on,target=native",
+      "-kernel",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/guest-3-1.elf",
+      "-trace",
+      "enable=skew_*",
+      "-D",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/mode3-skew-4.trace",
+      "-trace",
+      "enable=arm_gt_timer_expire"
+    ],
+    "delay_cpu": null,
+    "native_icount": false,
+    "records": [
+      [
+        "FREQ",
+        62500000,
+        3
+      ],
+      [
+        "PACKET",
+        1,
+        0
+      ],
+      [
+        "LATENCY",
+        1,
+        240
+      ],
+      [
+        "PACKET",
+        2,
+        0
+      ],
+      [
+        "LATENCY",
+        2,
+        220
+      ],
+      [
+        "PACKET",
+        3,
+        0
+      ],
+      [
+        "LATENCY",
+        3,
+        206
+      ],
+      [
+        "PACKET",
+        4,
+        0
+      ],
+      [
+        "LATENCY",
+        4,
+        191
+      ],
+      [
+        "PACKET",
+        5,
+        0
+      ],
+      [
+        "LATENCY",
+        5,
+        1736
+      ],
+      [
+        "PACKET",
+        6,
+        0
+      ],
+      [
+        "LATENCY",
+        6,
+        863
+      ],
+      [
+        "PACKET",
+        7,
+        0
+      ],
+      [
+        "LATENCY",
+        7,
+        14309
+      ],
+      [
+        "PACKET",
+        8,
+        0
+      ],
+      [
+        "LATENCY",
+        8,
+        19851
+      ],
+      [
+        "PACKET",
+        9,
+        0
+      ],
+      [
+        "LATENCY",
+        9,
+        14971
+      ],
+      [
+        "PACKET",
+        10,
+        0
+      ],
+      [
+        "LATENCY",
+        10,
+        16028
+      ],
+      [
+        "PACKET",
+        11,
+        0
+      ],
+      [
+        "LATENCY",
+        11,
+        13015
+      ],
+      [
+        "PACKET",
+        12,
+        0
+      ],
+      [
+        "LATENCY",
+        12,
+        14292
+      ],
+      [
+        "PACKET",
+        13,
+        0
+      ],
+      [
+        "LATENCY",
+        13,
+        12170
+      ],
+      [
+        "PACKET",
+        14,
+        0
+      ],
+      [
+        "LATENCY",
+        14,
+        13929
+      ],
+      [
+        "PACKET",
+        15,
+        0
+      ],
+      [
+        "LATENCY",
+        15,
+        12125
+      ],
+      [
+        "PACKET",
+        16,
+        0
+      ],
+      [
+        "LATENCY",
+        16,
+        14093
+      ],
+      [
+        "PACKET",
+        17,
+        0
+      ],
+      [
+        "LATENCY",
+        17,
+        12294
+      ],
+      [
+        "PACKET",
+        18,
+        0
+      ],
+      [
+        "LATENCY",
+        18,
+        13348
+      ],
+      [
+        "PACKET",
+        19,
+        0
+      ],
+      [
+        "LATENCY",
+        19,
+        12264
+      ],
+      [
+        "PACKET",
+        20,
+        0
+      ],
+      [
+        "LATENCY",
+        20,
+        13976
+      ],
+      [
+        "PACKET",
+        21,
+        0
+      ],
+      [
+        "LATENCY",
+        21,
+        12422
+      ],
+      [
+        "PACKET",
+        22,
+        0
+      ],
+      [
+        "LATENCY",
+        22,
+        13700
+      ],
+      [
+        "PACKET",
+        23,
+        0
+      ],
+      [
+        "LATENCY",
+        23,
+        12386
+      ],
+      [
+        "PACKET",
+        24,
+        0
+      ],
+      [
+        "LATENCY",
+        24,
+        14148
+      ],
+      [
+        "PACKET",
+        25,
+        0
+      ],
+      [
+        "LATENCY",
+        25,
+        13222
+      ],
+      [
+        "PACKET",
+        26,
+        0
+      ],
+      [
+        "LATENCY",
+        26,
+        12628
+      ],
+      [
+        "PACKET",
+        27,
+        0
+      ],
+      [
+        "LATENCY",
+        27,
+        13473
+      ],
+      [
+        "PACKET",
+        28,
+        0
+      ],
+      [
+        "LATENCY",
+        28,
+        12406
+      ],
+      [
+        "PACKET",
+        29,
+        0
+      ],
+      [
+        "LATENCY",
+        29,
+        13454
+      ],
+      [
+        "PACKET",
+        30,
+        0
+      ],
+      [
+        "LATENCY",
+        30,
+        12047
+      ],
+      [
+        "PACKET",
+        31,
+        0
+      ],
+      [
+        "LATENCY",
+        31,
+        13342
+      ],
+      [
+        "PACKET",
+        32,
+        0
+      ],
+      [
+        "LATENCY",
+        32,
+        12255
+      ],
+      [
+        "PACKET",
+        33,
+        1
+      ],
+      [
+        "LATENCY",
+        33,
+        312518
+      ],
+      [
+        "PACKET",
+        34,
+        1
+      ],
+      [
+        "LATENCY",
+        34,
+        312551
+      ]
+    ],
+    "trace": {
+      "updates": 4636,
+      "waits": 484,
+      "warps": 0,
+      "max_step_ns": 327692,
+      "max_lead_insns": 2000000,
+      "callback_lateness_ns": []
+    }
+  },
+  {
+    "mode": 4,
+    "skew": true,
+    "seconds": 0.4890845769987209,
+    "command": [
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "-M",
+      "virt,gic-version=2",
+      "-cpu",
+      "cortex-a57",
+      "-accel",
+      "tcg,thread=multi,skew=1000000,skew-ips=2000000000,skew-update=100000",
+      "-smp",
+      "2",
+      "-m",
+      "128M",
+      "-display",
+      "none",
+      "-serial",
+      "none",
+      "-monitor",
+      "none",
+      "-semihosting-config",
+      "enable=on,target=native",
+      "-kernel",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/guest-4-1.elf",
+      "-trace",
+      "enable=skew_*",
+      "-D",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/mode4-skew-5.trace",
+      "-trace",
+      "enable=arm_gt_timer_expire"
+    ],
+    "delay_cpu": null,
+    "native_icount": false,
+    "records": [
+      [
+        "FREQ",
+        62500000,
+        4
+      ],
+      [
+        "TIMER",
+        10,
+        24
+      ],
+      [
+        "POST_WARP",
+        0,
+        1938190
+      ],
+      [
+        "TIMER",
+        100,
+        3
+      ],
+      [
+        "POST_WARP",
+        1,
+        1987046
+      ],
+      [
+        "TIMER",
+        1000,
+        2
+      ],
+      [
+        "POST_WARP",
+        2,
+        1983542
+      ],
+      [
+        "TIMER",
+        10000,
+        2
+      ],
+      [
+        "POST_WARP",
+        3,
+        1984933
+      ],
+      [
+        "TIMER",
+        10,
+        12920
+      ],
+      [
+        "POST_WARP",
+        4,
+        1996061
+      ],
+      [
+        "TIMER",
+        100,
+        2
+      ],
+      [
+        "POST_WARP",
+        5,
+        1998858
+      ],
+      [
+        "TIMER",
+        1000,
+        2
+      ],
+      [
+        "POST_WARP",
+        6,
+        1992691
+      ],
+      [
+        "TIMER",
+        10000,
+        201
+      ],
+      [
+        "POST_WARP",
+        7,
+        1983541
+      ],
+      [
+        "TIMER",
+        10,
+        3378
+      ],
+      [
+        "POST_WARP",
+        8,
+        1982594
+      ],
+      [
+        "TIMER",
+        100,
+        4
+      ],
+      [
+        "POST_WARP",
+        9,
+        1992650
+      ],
+      [
+        "TIMER",
+        1000,
+        2
+      ],
+      [
+        "POST_WARP",
+        10,
+        1985045
+      ],
+      [
+        "TIMER",
+        10000,
+        3
+      ],
+      [
+        "POST_WARP",
+        11,
+        1988907
+      ],
+      [
+        "TIMER",
+        10,
+        4240
+      ],
+      [
+        "POST_WARP",
+        12,
+        1981637
+      ],
+      [
+        "TIMER",
+        100,
+        2
+      ],
+      [
+        "POST_WARP",
+        13,
+        1998877
+      ],
+      [
+        "TIMER",
+        1000,
+        2
+      ],
+      [
+        "POST_WARP",
+        14,
+        1988092
+      ],
+      [
+        "TIMER",
+        10000,
+        3
+      ],
+      [
+        "POST_WARP",
+        15,
+        1995629
+      ],
+      [
+        "TIMER",
+        10,
+        4022
+      ],
+      [
+        "POST_WARP",
+        16,
+        1980932
+      ],
+      [
+        "TIMER",
+        100,
+        2
+      ],
+      [
+        "POST_WARP",
+        17,
+        2000338
+      ],
+      [
+        "TIMER",
+        1000,
+        2
+      ],
+      [
+        "POST_WARP",
+        18,
+        1994258
+      ],
+      [
+        "TIMER",
+        10000,
+        2
+      ],
+      [
+        "POST_WARP",
+        19,
+        2000769
+      ],
+      [
+        "TIMER",
+        10,
+        4584
+      ],
+      [
+        "POST_WARP",
+        20,
+        1990327
+      ],
+      [
+        "TIMER",
+        100,
+        2
+      ],
+      [
+        "POST_WARP",
+        21,
+        1985063
+      ],
+      [
+        "TIMER",
+        1000,
+        2
+      ],
+      [
+        "POST_WARP",
+        22,
+        1991199
+      ],
+      [
+        "TIMER",
+        10000,
+        649
+      ],
+      [
+        "POST_WARP",
+        23,
+        1990819
+      ],
+      [
+        "TIMER",
+        10,
+        5628
+      ],
+      [
+        "POST_WARP",
+        24,
+        1985531
+      ],
+      [
+        "TIMER",
+        100,
+        2
+      ],
+      [
+        "POST_WARP",
+        25,
+        1991101
+      ],
+      [
+        "TIMER",
+        1000,
+        4
+      ],
+      [
+        "POST_WARP",
+        26,
+        1992674
+      ],
+      [
+        "TIMER",
+        10000,
+        57
+      ],
+      [
+        "POST_WARP",
+        27,
+        1993450
+      ],
+      [
+        "TIMER",
+        10,
+        4898
+      ],
+      [
+        "POST_WARP",
+        28,
+        1990015
+      ],
+      [
+        "TIMER",
+        100,
+        5
+      ],
+      [
+        "POST_WARP",
+        29,
+        2001139
+      ],
+      [
+        "TIMER",
+        1000,
+        2
+      ],
+      [
+        "POST_WARP",
+        30,
+        1997204
+      ],
+      [
+        "TIMER",
+        10000,
+        2
+      ],
+      [
+        "POST_WARP",
+        31,
+        2000370
+      ]
+    ],
+    "trace": {
+      "updates": 2820,
+      "waits": 4,
+      "warps": 120,
+      "max_step_ns": 10128148,
+      "max_lead_insns": 2000000,
+      "callback_lateness_ns": [
+        0,
+        0,
+        0,
+        0,
+        174720,
+        0,
+        0,
+        3168,
+        54000,
+        0,
+        0,
+        0,
+        67792,
+        0,
+        0,
+        0,
+        64304,
+        0,
+        0,
+        0,
+        73296,
+        0,
+        0,
+        10336,
+        51488,
+        0,
+        0,
+        880,
+        78320,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mode": 12,
+    "skew": true,
+    "seconds": 1.541218527003366,
+    "command": [
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "-M",
+      "virt,gic-version=2",
+      "-cpu",
+      "cortex-a57",
+      "-accel",
+      "tcg,thread=multi,skew=1000000,skew-ips=2000000000,skew-update=100000",
+      "-smp",
+      "2",
+      "-m",
+      "128M",
+      "-display",
+      "none",
+      "-serial",
+      "none",
+      "-monitor",
+      "none",
+      "-semihosting-config",
+      "enable=on,target=native",
+      "-kernel",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/guest-12-1.elf",
+      "-trace",
+      "enable=skew_*",
+      "-D",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/quick/mode12-skew-6.trace",
+      "-trace",
+      "enable=arm_gt_timer_expire"
+    ],
+    "delay_cpu": null,
+    "native_icount": false,
+    "records": [
+      [
+        "FREQ",
+        62500000,
+        12
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        68
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        481
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        213
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        640
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        90
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        487
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        202
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        384
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        249
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        277
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        469
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        254
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        281
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        60
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        156
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        170
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        160
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        51
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        197
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        339
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        262
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        227
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        317
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        221
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        82
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        248
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        27
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        16
+      ],
+      [
+        "TIMER_IRQ",
+        10,
+        83
+      ],
+      [
+        "TIMER_IRQ",
+        100,
+        92
+      ],
+      [
+        "TIMER_IRQ",
+        1000,
+        165
+      ],
+      [
+        "TIMER_IRQ",
+        10000,
+        81
+      ]
+    ],
+    "trace": {
+      "updates": 9228,
+      "waits": 2688,
+      "warps": 0,
+      "max_step_ns": 428266,
+      "max_lead_insns": 2000000,
+      "callback_lateness_ns": [
+        0,
+        1296,
+        1952,
+        1344,
+        496,
+        4096,
+        208,
+        352,
+        448,
+        784,
+        1120,
+        16,
+        2592,
+        192,
+        96,
+        1408,
+        192,
+        640,
+        1648,
+        32,
+        2960,
+        224,
+        784,
+        320,
+        80,
+        0,
+        96,
+        96,
+        544,
+        64,
+        672,
+        48
+      ]
+    }
+  }
+]

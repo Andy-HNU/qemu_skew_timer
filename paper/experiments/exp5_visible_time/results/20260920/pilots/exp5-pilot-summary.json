@@ -1,0 +1,275 @@
+{
+  "steady": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "host_seconds_median": 0.0410899150010664,
+      "guest_reads": 4000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 1,
+      "passed": 0,
+      "host_seconds_median": 0.018974807004269678,
+      "guest_reads": 0,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": null,
+      "model_equal_fraction": null,
+      "visible_delta_variance_ns2": null,
+      "model_delta_variance_ns2": null,
+      "max_abs_bias_ns": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.46178744842322567
+  },
+  "dense": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "host_seconds_median": 0.026615510003466625,
+      "guest_reads": 4000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 1,
+      "passed": 0,
+      "host_seconds_median": 0.02096890800021356,
+      "guest_reads": 0,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": null,
+      "model_equal_fraction": null,
+      "visible_delta_variance_ns2": null,
+      "model_delta_variance_ns2": null,
+      "max_abs_bias_ns": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.7878454328879062
+  },
+  "high-2g": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "host_seconds_median": 0.025415709998924285,
+      "guest_reads": 4000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 1,
+      "passed": 0,
+      "host_seconds_median": 0.01864140699763084,
+      "guest_reads": 0,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": null,
+      "model_equal_fraction": null,
+      "visible_delta_variance_ns2": null,
+      "model_delta_variance_ns2": null,
+      "max_abs_bias_ns": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.7334600134491553
+  },
+  "high-20g": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "host_seconds_median": 0.025487808998150285,
+      "guest_reads": 4000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 1,
+      "passed": 0,
+      "host_seconds_median": 0.019805707001069095,
+      "guest_reads": 0,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": null,
+      "model_equal_fraction": null,
+      "visible_delta_variance_ns2": null,
+      "model_delta_variance_ns2": null,
+      "max_abs_bias_ns": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.7770658906972524
+  },
+  "saturation": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "host_seconds_median": 0.7260680710023735,
+      "guest_reads": 16000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 1,
+      "passed": 0,
+      "host_seconds_median": 0.01854100700438721,
+      "guest_reads": 0,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": null,
+      "model_equal_fraction": null,
+      "visible_delta_variance_ns2": null,
+      "model_delta_variance_ns2": null,
+      "max_abs_bias_ns": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.025536182824828557
+  },
+  "cross-cpu": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "host_seconds_median": 0.04117421500268392,
+      "guest_reads": 4000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 1,
+      "passed": 0,
+      "host_seconds_median": 0.01976600699708797,
+      "guest_reads": 0,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": null,
+      "model_equal_fraction": null,
+      "visible_delta_variance_ns2": null,
+      "model_delta_variance_ns2": null,
+      "max_abs_bias_ns": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.4800578953551278
+  },
+  "burst": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "host_seconds_median": 0.04732381700159749,
+      "guest_reads": 4000,
+      "guest_backwards": 0
+    },
+    "probe": {
+      "runs": 1,
+      "passed": 0,
+      "host_seconds_median": 0.019898107995686587,
+      "guest_reads": 0,
+      "guest_backwards": 0,
+      "totals": {
+        "visible_backward": 0,
+        "counter_backward": 0,
+        "publication_backward": 0,
+        "model_backward": 0,
+        "host_order_violations": 0,
+        "bounds_violations": 0,
+        "slope_violations": 0,
+        "bound_hits": 0,
+        "plateau_pairs": 0,
+        "plateau_observed_host_ns": 0,
+        "bound_hits_positive_stored_slope": 0
+      },
+      "counter_equal_fraction": null,
+      "model_equal_fraction": null,
+      "visible_delta_variance_ns2": null,
+      "model_delta_variance_ns2": null,
+      "max_abs_bias_ns": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "observed_probe_to_baseline_host_ratio": 0.42046709788888953
+  }
+}

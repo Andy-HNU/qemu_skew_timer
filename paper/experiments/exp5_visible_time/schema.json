@@ -1,0 +1,21 @@
+{
+  "experiment": 5,
+  "version": 1,
+  "fields": {
+    "evidence": "enum:synthetic|measured",
+    "source_log": "str",
+    "run_id": "str",
+    "seq": "nonnegative",
+    "host_ns": "nonnegative",
+    "cpu": "nonnegative",
+    "global_icount": "nonnegative",
+    "model_ns": "nonnegative",
+    "visible_ns": "nonnegative",
+    "window_ns": "positive",
+    "slope_q32": "nonnegative",
+    "event": "enum:update|read|bound_hit|resume",
+    "counter_ticks": "nonnegative"
+  },
+  "units": "All *_ns fields are nanoseconds; IPS instructions/second; slope_q32 dimensionless *2^32; counts are executed guest instructions unless specified.",
+  "null_encoding": "Empty string allowed only for optional_* fields."
+}

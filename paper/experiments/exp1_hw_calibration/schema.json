@@ -1,0 +1,16 @@
+{
+  "experiment": 1,
+  "version": 1,
+  "fields": {
+    "evidence": "enum:synthetic|measured",
+    "source_log": "str",
+    "run_id": "str",
+    "workload": "str",
+    "split": "enum:calibration|validation",
+    "hardware_ns": "positive",
+    "instructions": "positive",
+    "selected_ips": "positive"
+  },
+  "units": "All *_ns fields are nanoseconds; IPS instructions/second; slope_q32 dimensionless *2^32; counts are executed guest instructions unless specified.",
+  "null_encoding": "Empty string allowed only for optional_* fields."
+}

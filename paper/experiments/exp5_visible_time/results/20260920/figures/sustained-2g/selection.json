@@ -1,0 +1,7 @@
+{
+  "source": "sustained/sustained-2g-probe-0.csv",
+  "rule": "ninth nonzero-global update through span; stable-history zoom",
+  "start_ns": 11444908,
+  "span_ns": 2000000,
+  "selected_rows": 48
+}

@@ -1,0 +1,7 @@
+{
+  "source": "saturation2g/saturation-2g-probe-0.csv",
+  "rule": "trace start through first read plus span",
+  "start_ns": 0,
+  "span_ns": 8000000,
+  "selected_rows": 63
+}

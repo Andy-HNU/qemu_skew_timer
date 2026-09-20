@@ -1,0 +1,138 @@
+[
+  {
+    "repeat": -1,
+    "host_seconds": 10.844778473001497,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter--1"
+    ],
+    "passed": true
+  },
+  {
+    "repeat": 0,
+    "host_seconds": 9.89396894199308,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter-0"
+    ],
+    "passed": true
+  },
+  {
+    "repeat": 1,
+    "host_seconds": 10.192621397000039,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter-1"
+    ],
+    "passed": true
+  },
+  {
+    "repeat": 2,
+    "host_seconds": 9.891755530996306,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter-2"
+    ],
+    "passed": true
+  },
+  {
+    "repeat": 3,
+    "host_seconds": 9.491783869998471,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter-3"
+    ],
+    "passed": true
+  },
+  {
+    "repeat": 4,
+    "host_seconds": 9.640385899998364,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter-4"
+    ],
+    "passed": true
+  },
+  {
+    "repeat": 5,
+    "host_seconds": 9.590973395002948,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter-5"
+    ],
+    "passed": true
+  },
+  {
+    "repeat": 6,
+    "host_seconds": 9.590148817005684,
+    "returncode": 0,
+    "command": [
+      "python3",
+      "/home/andy/qemu_skew_timer/tests/tcg/aarch64/system/skew-linux-jitter.py",
+      "/home/andy/qemu_skew_timer/build/qemu-system-aarch64",
+      "--kernel",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64",
+      "--module-dir",
+      "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto",
+      "--output",
+      "/home/andy/qemu_skew_timer/build/exp5-fixed-reuse-20260920/jitter-6"
+    ],
+    "passed": true
+  }
+]

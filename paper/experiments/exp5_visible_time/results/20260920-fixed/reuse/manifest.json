@@ -1,0 +1,14 @@
+{
+  "binaries": {
+    "/home/andy/qemu_skew_timer/build/qemu-system-aarch64": "d2a451691f54bc2c68b35289ba48fed83930972237a08b7feca0dc090db4bda7",
+    "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64": "a08ee489c733d77bbda363beff42094731f60637668dbedc6787791e0d7974ad",
+    "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto/af_alg.ko": "82a4e5732b9621a7c11e3fbb67f3d2198ba5e020c7e256b63643b5adcf722f00",
+    "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto/jitterentropy_rng.ko": "ef71ff1d1dab6c2704e85b6f4ece4f7e1a6367bb4f04440da397f953a37a8ad3",
+    "/home/andy/qemu_skew_timer/build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto/algif_rng.ko": "035d68038b7246404a98c2fdfdebc10dbbfcd597f34ba03658e3ca016cd3d496"
+  },
+  "mode": "skew continuously from reset",
+  "ips": 2000000000,
+  "window_ns": 1000000,
+  "update_ns": 100000,
+  "vcpus": 2
+}

@@ -1,0 +1,276 @@
+{
+  "experiment": 3,
+  "evidence": "synthetic",
+  "input": "\\\\wsl.localhost\\Ubuntu-20.04\\home\\andy\\qemu_skew_timer\\paper\\experiments\\exp3_parallel\\example.csv",
+  "rows": 36,
+  "input_sha256": "a6279fc226064a78b8990067029143c06dbf33a00717e629f60cac954eea745e",
+  "python_version": "3.12.14",
+  "matplotlib_version": "3.11.2",
+  "error_bars": "min--max; center median; not confidence intervals",
+  "groups": [
+    {
+      "method": "icount",
+      "vcpus": 1,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 2472000000,
+        "mean": 2472000000,
+        "min": 2400000000,
+        "max": 2544000000,
+        "stddev_sample": 72000000.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 80906148.86731392,
+        "mean": 80951944.80063504,
+        "min": 78616352.20125785,
+        "max": 83333333.33333333,
+        "stddev_sample": 2358824.0080007175
+      }
+    },
+    {
+      "method": "icount",
+      "vcpus": 2,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 2472000000,
+        "mean": 2472000000,
+        "min": 2400000000,
+        "max": 2544000000,
+        "stddev_sample": 72000000.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 80906148.86731392,
+        "mean": 80951944.80063504,
+        "min": 78616352.20125785,
+        "max": 83333333.33333333,
+        "stddev_sample": 2358824.0080007175
+      }
+    },
+    {
+      "method": "icount",
+      "vcpus": 4,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 2472000000,
+        "mean": 2472000000,
+        "min": 2400000000,
+        "max": 2544000000,
+        "stddev_sample": 72000000.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 80906148.86731392,
+        "mean": 80951944.80063504,
+        "min": 78616352.20125785,
+        "max": 83333333.33333333,
+        "stddev_sample": 2358824.0080007175
+      }
+    },
+    {
+      "method": "icount",
+      "vcpus": 8,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 2472000000,
+        "mean": 2472000000,
+        "min": 2400000000,
+        "max": 2544000000,
+        "stddev_sample": 72000000.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 80906148.86731392,
+        "mean": 80951944.80063504,
+        "min": 78616352.20125785,
+        "max": 83333333.33333333,
+        "stddev_sample": 2358824.0080007175
+      }
+    },
+    {
+      "method": "mttcg",
+      "vcpus": 1,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 1030000000,
+        "mean": 1030000000,
+        "min": 1000000000,
+        "max": 1060000000,
+        "stddev_sample": 30000000.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 194174757.2815534,
+        "mean": 194284667.52152407,
+        "min": 188679245.28301886,
+        "max": 200000000.0,
+        "stddev_sample": 5661177.619201725
+      }
+    },
+    {
+      "method": "mttcg",
+      "vcpus": 2,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 624242424,
+        "mean": 624242424,
+        "min": 606060606,
+        "max": 642424242,
+        "stddev_sample": 18181818.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 320388349.63898575,
+        "mean": 320569701.5315187,
+        "min": 311320754.9225703,
+        "max": 330000000.033,
+        "stddev_sample": 9340942.985350674
+      }
+    },
+    {
+      "method": "mttcg",
+      "vcpus": 4,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 349152542,
+        "mean": 349152541.6666667,
+        "min": 338983050,
+        "max": 359322033,
+        "stddev_sample": 10169491.500000004
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 572815534.5923272,
+        "mean": 573139770.3479141,
+        "min": 556603774.9764152,
+        "max": 590000001.475,
+        "stddev_sample": 16700474.026359139
+      }
+    },
+    {
+      "method": "mttcg",
+      "vcpus": 8,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 185585585,
+        "mean": 185585585,
+        "min": 180180180,
+        "max": 190990990,
+        "stddev_sample": 5405405.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 1077669906.3130362,
+        "mean": 1078279908.059073,
+        "min": 1047169816.754183,
+        "max": 1110000001.11,
+        "stddev_sample": 31419533.623911556
+      }
+    },
+    {
+      "method": "skew",
+      "vcpus": 1,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 1236000000,
+        "mean": 1236000000,
+        "min": 1200000000,
+        "max": 1272000000,
+        "stddev_sample": 36000000.0
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 161812297.73462784,
+        "mean": 161903889.60127008,
+        "min": 157232704.4025157,
+        "max": 166666666.66666666,
+        "stddev_sample": 4717648.016001435
+      }
+    },
+    {
+      "method": "skew",
+      "vcpus": 2,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 749090909,
+        "mean": 749090908.6666666,
+        "min": 727272727,
+        "max": 770909090,
+        "stddev_sample": 21818181.500000004
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 266990291.29453766,
+        "mean": 267141417.98924994,
+        "min": 259433962.57008722,
+        "max": 275000000.103125,
+        "stddev_sample": 7784119.126681965
+      }
+    },
+    {
+      "method": "skew",
+      "vcpus": 4,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 418983050,
+        "mean": 418983050.3333333,
+        "min": 406779661,
+        "max": 431186440,
+        "stddev_sample": 12203389.500000004
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 477346279.28265834,
+        "mean": 477616474.89551175,
+        "min": 463836478.71672404,
+        "max": 491666666.6871528,
+        "stddev_sample": 13917061.287112786
+      }
+    },
+    {
+      "method": "skew",
+      "vcpus": 8,
+      "attempts": 3,
+      "failures": 0,
+      "host_ns": {
+        "n": 3,
+        "median": 222702702,
+        "mean": 222702702.33333334,
+        "min": 216216216,
+        "max": 229189189,
+        "stddev_sample": 6486486.5000000065
+      },
+      "throughput_ips": {
+        "n": 3,
+        "median": 898058255.2608634,
+        "mean": 898566588.7800555,
+        "min": 872641510.1543031,
+        "max": 925000000.925,
+        "stddev_sample": 26182946.571601488
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "experiment": 5,
+  "evidence": "measured",
+  "input": "\\\\wsl.localhost\\Ubuntu-20.04\\home\\andy\\qemu_skew_timer\\paper\\experiments\\exp5_visible_time\\results\\20260920\\saturation2g\\saturation-2g-probe-0.csv",
+  "rows": 4007,
+  "input_sha256": "68226ff2490454410e5e3ea8409e3c08a99cce9abc6d1adaafb44e419be5e85d",
+  "python_version": "3.12.14",
+  "matplotlib_version": "3.11.2",
+  "error_bars": "min--max; center median; not confidence intervals",
+  "read_count": 4000,
+  "monotonic_violations": 0,
+  "model_backward_steps": 0,
+  "bound_violations": 0,
+  "max_abs_bias_ns": 10000,
+  "repeated_counter_pairs": 3958,
+  "visible_delta_variance_ns2": 4997.78544235959,
+  "model_delta_variance_ns2": 49987.49062109238,
+  "max_observation_gap_ns": 80638885
+}

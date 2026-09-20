@@ -1,0 +1,19 @@
+diagram,order,label
+D1,0,Per-vCPU raw counts
+D1,1,Epoch mapping and active set
+D1,2,Minimum active progress G
+D1,3,Instruction window and budget
+D1,4,Shared visible clock
+D1,5,Guest and virtual-clock devices
+D2,0,Global progress G
+D2,1,Active CPU 0
+D2,2,Active CPU 1
+D2,3,Active CPU 2
+D2,4,Upper limit G + W
+D3,0,G and accumulated offsets
+D3,1,Strict model time M
+D3,2,History and feedback
+D3,3,Host elapsed from anchor
+D3,4,Bounded shared interpolation V
+D3,5,Counter and clock reads
+

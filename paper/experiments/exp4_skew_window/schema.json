@@ -1,0 +1,20 @@
+{
+  "experiment": 4,
+  "version": 1,
+  "fields": {
+    "evidence": "enum:synthetic|measured",
+    "source_log": "str",
+    "run_id": "str",
+    "workload": "str",
+    "window_insns": "positive_int",
+    "sim_ips": "positive",
+    "host_ns": "positive",
+    "instructions": "positive",
+    "max_active_spread_insns": "nonnegative",
+    "max_lead_insns": "nonnegative",
+    "wait_count": "nonnegative",
+    "budget_exit_count": "optional_nonnegative"
+  },
+  "units": "All *_ns fields are nanoseconds; IPS instructions/second; slope_q32 dimensionless *2^32; counts are executed guest instructions unless specified.",
+  "null_encoding": "Empty string allowed only for optional_* fields."
+}

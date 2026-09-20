@@ -1,0 +1,6 @@
+# Preserve measured evidence byte-for-byte, including guest serial line endings.
+experiments/exp5_visible_time/results/** -text -whitespace
+# Generated cross-platform tables and plots may use CRLF.
+*.csv -text whitespace=cr-at-eol
+# Plot generators intentionally retain whitespace in SVG path data.
+figures/** -text -whitespace

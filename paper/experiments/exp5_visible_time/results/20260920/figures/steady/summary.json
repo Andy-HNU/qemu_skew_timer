@@ -1,0 +1,19 @@
+{
+  "experiment": 5,
+  "evidence": "measured",
+  "input": "\\\\wsl.localhost\\Ubuntu-20.04\\home\\andy\\qemu_skew_timer\\paper\\experiments\\exp5_visible_time\\results\\20260920\\short\\steady-probe-0.csv",
+  "rows": 4021,
+  "input_sha256": "d91ddbb2a3304329d04a4bbdb58ca600c108bbe5d36fae562eeff9c34939374f",
+  "python_version": "3.12.14",
+  "matplotlib_version": "3.11.2",
+  "error_bars": "min--max; center median; not confidence intervals",
+  "read_count": 4000,
+  "monotonic_violations": 0,
+  "model_backward_steps": 0,
+  "bound_violations": 0,
+  "max_abs_bias_ns": 1000000,
+  "repeated_counter_pairs": 885,
+  "visible_delta_variance_ns2": 140327169.78206855,
+  "model_delta_variance_ns2": 490732277.40504456,
+  "max_observation_gap_ns": 8695501
+}

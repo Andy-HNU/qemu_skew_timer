@@ -1,0 +1,50 @@
+[
+  {
+    "case": "sustained-20g",
+    "source": "sustained/sustained-20g-probe-0.csv",
+    "configured_ips": 20000000000,
+    "uint32_ips": 2820130816,
+    "rows_nonzero_G": 12099,
+    "nominal_mismatches": 12099,
+    "uint32_mismatches": 0,
+    "first_nonzero_sample": {
+      "evidence": "measured",
+      "source_log": "probe-memory-buffer",
+      "run_id": "run",
+      "seq": "59",
+      "host_ns": "10390601",
+      "cpu": "0",
+      "global_icount": "2820130",
+      "model_ns": "999999",
+      "visible_ns": "37937",
+      "window_ns": "1000000",
+      "slope_q32": "256953606",
+      "event": "update",
+      "counter_ticks": "0"
+    }
+  },
+  {
+    "case": "saturation-20g",
+    "source": "short/saturation-probe-0.csv",
+    "configured_ips": 20000000000,
+    "uint32_ips": 2820130816,
+    "rows_nonzero_G": 1989,
+    "nominal_mismatches": 1989,
+    "uint32_mismatches": 0,
+    "first_nonzero_sample": {
+      "evidence": "measured",
+      "source_log": "probe-memory-buffer",
+      "run_id": "run",
+      "seq": "2018",
+      "host_ns": "360083107",
+      "cpu": "0",
+      "global_icount": "28201",
+      "model_ns": "9999",
+      "visible_ns": "10000",
+      "window_ns": "10000",
+      "slope_q32": "16777216",
+      "event": "update",
+      "counter_ticks": "0"
+    }
+  }
+]

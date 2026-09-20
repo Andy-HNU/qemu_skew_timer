@@ -1,0 +1,2141 @@
+{
+  "passed": true,
+  "samples": [
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 23517844,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 23517844
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 22993504
+        }
+      ],
+      "global-icount": 23517844,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 27104,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 11786026,
+      "model-ns": 11758922,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 11786026
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 24435334,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 24435334
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 22993504
+        }
+      ],
+      "global-icount": 24435334,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 36347,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 12254014,
+      "model-ns": 12217667,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 12254014
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 26731332,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 26731332
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 24500869
+        }
+      ],
+      "global-icount": 26731332,
+      "visible-slope-q32": 257009685,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 35846,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 13401512,
+      "model-ns": 13365666,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 13401512
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 26927937,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 26927937
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 24500869
+        }
+      ],
+      "global-icount": 26927937,
+      "visible-slope-q32": 134863364,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 73789,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 13537757,
+      "model-ns": 13463968,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 13537757
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 27452217,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 27452217
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 24500869
+        }
+      ],
+      "global-icount": 27452217,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 97674,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 13823782,
+      "model-ns": 13726108,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 13823782
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 33678042,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 33678042
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 24500869
+        }
+      ],
+      "global-icount": 33678042,
+      "visible-slope-q32": 113135322,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 56050,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 16895071,
+      "model-ns": 16839021,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 16895071
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 33874647,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 33874647
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 24500869
+        }
+      ],
+      "global-icount": 33874647,
+      "visible-slope-q32": 88492414,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 74453,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 17011776,
+      "model-ns": 16937323,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 17011776
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 82449930,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 82449930
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 82448583
+        }
+      ],
+      "global-icount": 82449930,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 6907,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 41231872,
+      "model-ns": 41224965,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 41231872
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 82598550,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 82598550
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 82515465
+        }
+      ],
+      "global-icount": 82598550,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 69825,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 41369100,
+      "model-ns": 41299275,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 41369100
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 96360900,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 96360900
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 82515465
+        }
+      ],
+      "global-icount": 96360900,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 48300,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 48228750,
+      "model-ns": 48180450,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 48228750
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 96705503,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 96705503
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 96705503
+        }
+      ],
+      "global-icount": 96705503,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 75048,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 48427799,
+      "model-ns": 48352751,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 48427799
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 96836573,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 96836573
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 96705503
+        }
+      ],
+      "global-icount": 96836573,
+      "visible-slope-q32": 58218084,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 94192,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 48512478,
+      "model-ns": 48418286,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 48512478
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 97295318,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 97295318
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 96705503
+        }
+      ],
+      "global-icount": 97295318,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 107287,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 48754946,
+      "model-ns": 48647659,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 48754946
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 97434709,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 97434709
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 97368842
+        }
+      ],
+      "global-icount": 97434709,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 126593,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 48843947,
+      "model-ns": 48717354,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 48843947
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 97631474,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 97631474
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 97500244
+        }
+      ],
+      "global-icount": 97631474,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 139817,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 48955554,
+      "model-ns": 48815737,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 48955554
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 98548964,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 98548964
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 97500244
+        }
+      ],
+      "global-icount": 98548964,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 183132,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 49457614,
+      "model-ns": 49274482,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 49457614
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 99466454,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 99466454
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 0,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 97500244
+        }
+      ],
+      "global-icount": 99466454,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 123794,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 49857021,
+      "model-ns": 49733227,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 49857021
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 99953260,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 99925199
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 77082,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 99946501
+        }
+      ],
+      "global-icount": 99925199,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 132838,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 50095437,
+      "model-ns": 49962599,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 50095437
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 101291718,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 105436656
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 8974736,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 107206101
+        }
+      ],
+      "global-icount": 105436656,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 131545,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 52849873,
+      "model-ns": 52718328,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 52849873
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 101896309,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 106041247
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 9033698,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 107265063
+        }
+      ],
+      "global-icount": 106041247,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 150773,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 53171396,
+      "model-ns": 53020623,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 53171396
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 103642150,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 107745157
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 9048319,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 107745157
+        }
+      ],
+      "global-icount": 107745157,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 87880,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 53960458,
+      "model-ns": 53872578,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 53960458
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 105099304,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 109202311
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 9054251,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 107961876
+        }
+      ],
+      "global-icount": 109202311,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 88727,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 54689882,
+      "model-ns": 54601155,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 54689882
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 105653166,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 109756173
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 9055430,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 109755311
+        }
+      ],
+      "global-icount": 109756173,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 90762,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 54968848,
+      "model-ns": 54878086,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 54968848
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 106403326,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 110477058
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 9062175,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 109893988
+        }
+      ],
+      "global-icount": 110477058,
+      "visible-slope-q32": 190156513,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 84418,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 55322947,
+      "model-ns": 55238529,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 55322947
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 106806916,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 110870268
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 9092434,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 110690186
+        }
+      ],
+      "global-icount": 110870268,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 89447,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 55524581,
+      "model-ns": 55435134,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 55524581
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 111669678,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 115714351
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 9100135,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 111074574
+        }
+      ],
+      "global-icount": 115714351,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 69303,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 57926478,
+      "model-ns": 57857175,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 57926478
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 112338961,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 116383634
+        },
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 9105825,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 115982181
+        }
+      ],
+      "global-icount": 116383634,
+      "visible-slope-q32": 76510428,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 49470,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 58241287,
+      "model-ns": 58191817,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 58241287
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 148982448,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 152986178
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 9385629,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 152979556
+        }
+      ],
+      "global-icount": 152979556,
+      "visible-slope-q32": 42949672,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": -274815,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 76214963,
+      "model-ns": 76489778,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 76214963
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 149048829,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 153567513
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 10190275,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 153689460
+        }
+      ],
+      "global-icount": 153689460,
+      "visible-slope-q32": 71819509,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": -78501,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 76766229,
+      "model-ns": 76844730,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 76766229
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 149067875,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 154218611
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 11173300,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 154672485
+        }
+      ],
+      "global-icount": 154672485,
+      "visible-slope-q32": 167159272,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 14578,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 77350820,
+      "model-ns": 77336242,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 77350820
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 179298366,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 185078896
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 15067144,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 184947826
+        }
+      ],
+      "global-icount": 184947826,
+      "visible-slope-q32": 61516798,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 36975,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 92510888,
+      "model-ns": 92473913,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 92510888
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 179360544,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 185141074
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 15525889,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 185406571
+        }
+      ],
+      "global-icount": 185406571,
+      "visible-slope-q32": 124342268,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 28626,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 92731911,
+      "model-ns": 92703285,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 92731911
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 180411402,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 185497005
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 18620208,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 185550052
+        }
+      ],
+      "global-icount": 185550052,
+      "visible-slope-q32": 76056392,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 190795,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 92965821,
+      "model-ns": 92775026,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 92965821
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 180417253,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 186430090
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 19529594,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 186459438
+        }
+      ],
+      "global-icount": 186459438,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 179672,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 93409391,
+      "model-ns": 93229719,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 93409391
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 180424596,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 186532316
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 19883668,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 186813512
+        }
+      ],
+      "global-icount": 186813512,
+      "visible-slope-q32": 24184989,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 152336,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 93559092,
+      "model-ns": 93406756,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 93559092
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 180472448,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 186992434
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 20472942,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 186992434
+        }
+      ],
+      "global-icount": 186992434,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 166746,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 93662963,
+      "model-ns": 93496217,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 93662963
+    },
+    {
+      "cpus": [
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 180626539,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 187146525
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 21093301,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 187539735
+        }
+      ],
+      "global-icount": 187080990,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 185865,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 93726360,
+      "model-ns": 93540495,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 93726360
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 181595926,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 188070805
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 21147763,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 188064015
+        }
+      ],
+      "global-icount": 188064015,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 146681,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 94178688,
+      "model-ns": 94032007,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 94178688
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 181611030,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 193976124
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 27166709,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 194040456
+        }
+      ],
+      "global-icount": 194040456,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 30753,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 97050981,
+      "model-ns": 97020228,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 97050981
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 185500357,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 197900317
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 27452210,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 197850050
+        }
+      ],
+      "global-icount": 197850050,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 97135,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 99022160,
+      "model-ns": 98925025,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 99022160
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 188388742,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 205214859
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 32350160,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 205202083
+        }
+      ],
+      "global-icount": 205202083,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 15915,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 102616956,
+      "model-ns": 102601041,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 102616956
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 188388742,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 205214859
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 32808905,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 205660828
+        }
+      ],
+      "global-icount": 205660828,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 31816,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 102862230,
+      "model-ns": 102830414,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 102862230
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 188428790,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 207290036
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 34477913,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 207277349
+        }
+      ],
+      "global-icount": 207277349,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 56691,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 103695365,
+      "model-ns": 103638674,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 103695365
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 188484917,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 207623655
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 35406632,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 207998234
+        }
+      ],
+      "global-icount": 207998234,
+      "visible-slope-q32": 111211210,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 38014,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 104037131,
+      "model-ns": 103999117,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 104037131
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 188586168,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 209107688
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 36693130,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 209226158
+        }
+      ],
+      "global-icount": 209160623,
+      "visible-slope-q32": 35950191,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 45317,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 104625628,
+      "model-ns": 104580311,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 104625628
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 188689071,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 250990815
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 79887275,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 252420303
+        }
+      ],
+      "global-icount": 252420303,
+      "visible-slope-q32": 170378753,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 58413,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 126268564,
+      "model-ns": 126210151,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 126268564
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 190709421,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 254915773
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 80580736,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 254837836
+        }
+      ],
+      "global-icount": 254837836,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 80305,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 127499223,
+      "model-ns": 127418918,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 127499223
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 190735475,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 255112591
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 81037476,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 255165511
+        }
+      ],
+      "global-icount": 255165511,
+      "visible-slope-q32": 264945494,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 60373,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 127643128,
+      "model-ns": 127582755,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 127643128
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 234776743,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 342502878
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 127620143,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 345479038
+        }
+      ],
+      "global-icount": 345479038,
+      "visible-slope-q32": 131446988,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 153665,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 172893184,
+      "model-ns": 172739519,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 172893184
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 236111395,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 346845300
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 128044610,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 346787615
+        }
+      ],
+      "global-icount": 346787615,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 128110,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 173521917,
+      "model-ns": 173393807,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 173521917
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735182994,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 844508193
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 130036347,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 845090517
+        }
+      ],
+      "global-icount": 845090517,
+      "visible-slope-q32": 47744465,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 190949,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 422736207,
+      "model-ns": 422545258,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 422736207
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735182994,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 844508193
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 133837377,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 848891547
+        }
+      ],
+      "global-icount": 848891547,
+      "visible-slope-q32": 279305377,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 235334,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 424681107,
+      "model-ns": 424445773,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 424681107
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735206617,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 858933037
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 144075726,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 859129896
+        }
+      ],
+      "global-icount": 859129896,
+      "visible-slope-q32": 132269727,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 39776,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 429604724,
+      "model-ns": 429564948,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 429604724
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735206617,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 859475949
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 144421779,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 859475949
+        }
+      ],
+      "global-icount": 859475949,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 177409,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 429915383,
+      "model-ns": 429737974,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 429915383
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735209023,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 865563838
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 150641607,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 865695777
+        }
+      ],
+      "global-icount": 865695777,
+      "visible-slope-q32": 168706465,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 117948,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 432965836,
+      "model-ns": 432847888,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 432965836
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735293016,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 905374229
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 190329809,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 905376686
+        }
+      ],
+      "global-icount": 905376686,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 203736,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 452892079,
+      "model-ns": 452688343,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 452892079
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735307873,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 909556227
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 197263114,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 912309991
+        }
+      ],
+      "global-icount": 912309991,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 146043,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 456301038,
+      "model-ns": 456154995,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 456301038
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735752516,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 2212239876
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 1544335204,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 2259382081
+        }
+      ],
+      "global-icount": 2259382081,
+      "visible-slope-q32": 16777216,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 20646,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 1129711686,
+      "model-ns": 1129691040,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 1129711686
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735776931,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 3243067443
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 2892440200,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 3607487077
+        }
+      ],
+      "global-icount": 3607487077,
+      "visible-slope-q32": 1132187937,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 205676,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 1803949214,
+      "model-ns": 1803743538,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 1803949214
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735840193,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 4354885894
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 4239602740,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 4954649617
+        }
+      ],
+      "global-icount": 4954649617,
+      "visible-slope-q32": 1616390353,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 132419,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 2477457227,
+      "model-ns": 2477324808,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 2477457227
+    },
+    {
+      "cpus": [
+        {
+          "active": false,
+          "budget-enabled": true,
+          "raw-icount": 735891356,
+          "halted": true,
+          "waiting": false,
+          "cpu-index": 0,
+          "local-icount": 6298782993
+        },
+        {
+          "active": true,
+          "budget-enabled": true,
+          "raw-icount": 5588040256,
+          "halted": false,
+          "waiting": false,
+          "cpu-index": 1,
+          "local-icount": 6303087133
+        }
+      ],
+      "global-icount": 6303087133,
+      "visible-slope-q32": 775431400,
+      "ips": 2000000000,
+      "update-ns": 100000,
+      "visible-bias-ns": 212207,
+      "window-ns": 1000000,
+      "mode": "skew",
+      "start-ns": 0,
+      "mttcg-elapsed-ns": 0,
+      "virtual-ns": 3151755773,
+      "model-ns": 3151543566,
+      "window-insns": 2000000,
+      "skew-elapsed-ns": 3151755773
+    }
+  ],
+  "sample_count": 61
+}

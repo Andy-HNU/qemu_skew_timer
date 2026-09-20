@@ -1,0 +1,18 @@
+{
+  "experiment": 3,
+  "version": 1,
+  "fields": {
+    "evidence": "enum:synthetic|measured",
+    "source_log": "str",
+    "run_id": "str",
+    "workload": "str",
+    "method": "enum:mttcg|icount|skew",
+    "vcpus": "positive_int",
+    "work_mode": "enum:fixed_total|fixed_per_cpu",
+    "host_ns": "positive",
+    "instructions": "positive",
+    "completed": "bool"
+  },
+  "units": "All *_ns fields are nanoseconds; IPS instructions/second; slope_q32 dimensionless *2^32; counts are executed guest instructions unless specified.",
+  "null_encoding": "Empty string allowed only for optional_* fields."
+}

@@ -1,0 +1,16 @@
+evidence,source_log,run_id,workload,split,hardware_ns,instructions,selected_ips,equivalent_ips,reconstructed_ns,relative_error
+synthetic,synthetic:make_examples.py,example-0,RX,calibration,1000000,180000,200000000,180000000.0,900000.0,-0.09999999999999998
+synthetic,synthetic:make_examples.py,example-1,RX,calibration,1000000,182000,200000000,182000000.0,910000.0,-0.08999999999999997
+synthetic,synthetic:make_examples.py,example-2,RX,calibration,1000000,184000,200000000,184000000.0,920000.0,-0.07999999999999996
+synthetic,synthetic:make_examples.py,example-3,TX,calibration,2000000,380000,200000000,190000000.0,1900000.0,-0.050000000000000044
+synthetic,synthetic:make_examples.py,example-4,TX,calibration,2000000,384000,200000000,192000000.0,1920000.0,-0.040000000000000036
+synthetic,synthetic:make_examples.py,example-5,TX,calibration,2000000,388000,200000000,194000000.0,1940000.0,-0.030000000000000027
+synthetic,synthetic:make_examples.py,example-6,Parsing,calibration,3000000,600000,200000000,200000000.0,3000000.0,0.0
+synthetic,synthetic:make_examples.py,example-7,Parsing,calibration,3000000,606000,200000000,202000000.0,3030000.0,0.010000000000000009
+synthetic,synthetic:make_examples.py,example-8,Parsing,calibration,3000000,612000,200000000,204000000.0,3060000.0,0.020000000000000018
+synthetic,synthetic:make_examples.py,example-9,IRQ-task,validation,4000000,840000,200000000,210000000.0,4200000.0,0.050000000000000044
+synthetic,synthetic:make_examples.py,example-10,IRQ-task,validation,4000000,848000,200000000,212000000.0,4240000.0,0.06000000000000005
+synthetic,synthetic:make_examples.py,example-11,IRQ-task,validation,4000000,856000,200000000,214000000.0,4280000.0,0.07000000000000006
+synthetic,synthetic:make_examples.py,example-12,Control,validation,5000000,1100000,200000000,220000000.0,5500000.0,0.10000000000000009
+synthetic,synthetic:make_examples.py,example-13,Control,validation,5000000,1110000,200000000,222000000.0,5550000.0,0.1100000000000001
+synthetic,synthetic:make_examples.py,example-14,Control,validation,5000000,1120000,200000000,224000000.0,5600000.0,0.1200000000000001

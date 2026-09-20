@@ -1,0 +1,5 @@
+{"QMP": {"version": {"qemu": {"micro": 0, "minor": 2, "major": 10}, "package": ""}, "capabilities": ["oob"]}}
+{"return": {}, "id": 0}
+{"return": {"cpus": [{"active": false, "budget-enabled": true, "raw-icount": 0, "halted": false, "waiting": false, "cpu-index": 0, "local-icount": 0}], "global-icount": 0, "visible-slope-q32": 0, "ips": 4494967296, "update-ns": 100000, "visible-bias-ns": 0, "window-ns": 1000000, "mode": "skew", "start-ns": 0, "mttcg-elapsed-ns": 0, "virtual-ns": 0, "model-ns": 0, "window-insns": 4494967, "skew-elapsed-ns": 0}, "id": 1}
+{"timestamp": {"seconds": 1789885962, "microseconds": 951960}, "event": "SHUTDOWN", "data": {"guest": false, "reason": "host-qmp-quit"}}
+{"return": {}, "id": 2}

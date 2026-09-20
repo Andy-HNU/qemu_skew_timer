@@ -1,0 +1,147 @@
+{
+  "experiment": 4,
+  "evidence": "synthetic",
+  "input": "\\\\wsl.localhost\\Ubuntu-20.04\\home\\andy\\qemu_skew_timer\\paper\\experiments\\exp4_skew_window\\example.csv",
+  "rows": 15,
+  "input_sha256": "b00a0f1a0bc9da9b2178ad760fdd4cc2003b257f72aac5a54d99cc655118f23e",
+  "python_version": "3.12.14",
+  "matplotlib_version": "3.11.2",
+  "error_bars": "min--max; center median; not confidence intervals",
+  "groups": [
+    {
+      "window_insns": 1000,
+      "throughput_ips": {
+        "n": 3,
+        "median": 98039215.68627451,
+        "mean": 98064353.94670689,
+        "min": 96153846.15384616,
+        "max": 100000000.0,
+        "stddev_sample": 1923200.1458959412
+      },
+      "max_observed_spread_ns": 3295.0,
+      "lead_bound_violations": 0,
+      "spread_bound_violations": 0,
+      "wait_rate": {
+        "n": 3,
+        "median": 4901.9607843137255,
+        "mean": 4903.217697335344,
+        "min": 4807.692307692308,
+        "max": 5000.0,
+        "stddev_sample": 96.16000729479724
+      },
+      "budget_exit_rate": [
+        10000.0,
+        9803.921568627451,
+        9615.384615384615
+      ]
+    },
+    {
+      "window_insns": 10000,
+      "throughput_ips": {
+        "n": 3,
+        "median": 108932461.87363835,
+        "mean": 108960393.27411877,
+        "min": 106837606.83760683,
+        "max": 111111111.1111111,
+        "stddev_sample": 2136889.050995493
+      },
+      "max_observed_spread_ns": 32995.0,
+      "lead_bound_violations": 0,
+      "spread_bound_violations": 0,
+      "wait_rate": {
+        "n": 3,
+        "median": 2723.3115468409587,
+        "mean": 2724.009831852969,
+        "min": 2670.940170940171,
+        "max": 2777.777777777778,
+        "stddev_sample": 53.42222627488738
+      },
+      "budget_exit_rate": [
+        11111.111111111111,
+        10893.246187363835,
+        10683.760683760684
+      ]
+    },
+    {
+      "window_insns": 100000,
+      "throughput_ips": {
+        "n": 3,
+        "median": 122549019.60784313,
+        "mean": 122580442.43338361,
+        "min": 120192307.6923077,
+        "max": 125000000.0,
+        "stddev_sample": 2404000.1823699283
+      },
+      "max_observed_spread_ns": 329995.0,
+      "lead_bound_violations": 0,
+      "spread_bound_violations": 0,
+      "wait_rate": {
+        "n": 3,
+        "median": 2042.2794117647059,
+        "mean": 2042.803073152338,
+        "min": 2003.0048076923076,
+        "max": 2083.125,
+        "stddev_sample": 40.062663039194916
+      },
+      "budget_exit_rate": [
+        12500.0,
+        12254.901960784313,
+        12019.23076923077
+      ]
+    },
+    {
+      "window_insns": 1000000,
+      "throughput_ips": {
+        "n": 3,
+        "median": 140056022.4089636,
+        "mean": 140091934.2095813,
+        "min": 137362637.36263737,
+        "max": 142857142.85714287,
+        "stddev_sample": 2747428.7798513486
+      },
+      "max_observed_spread_ns": 3299995.0,
+      "lead_bound_violations": 0,
+      "spread_bound_violations": 0,
+      "wait_rate": {
+        "n": 3,
+        "median": 1750.7002801120448,
+        "mean": 1751.1491776197659,
+        "min": 1717.032967032967,
+        "max": 1785.7142857142858,
+        "stddev_sample": 34.342859748141905
+      },
+      "budget_exit_rate": [
+        14285.714285714286,
+        14005.602240896358,
+        13736.263736263736
+      ]
+    },
+    {
+      "window_insns": 10000000,
+      "throughput_ips": {
+        "n": 3,
+        "median": 163398692.81045753,
+        "mean": 163440589.91117814,
+        "min": 160256410.25641027,
+        "max": 166666666.66666666,
+        "stddev_sample": 3205333.576493228
+      },
+      "max_observed_spread_ns": 32999995.0,
+      "lead_bound_violations": 0,
+      "spread_bound_violations": 0,
+      "wait_rate": {
+        "n": 3,
+        "median": 1633.986928104575,
+        "mean": 1634.4058991117815,
+        "min": 1602.5641025641025,
+        "max": 1666.6666666666667,
+        "stddev_sample": 32.05333576493245
+      },
+      "budget_exit_rate": [
+        16666.666666666668,
+        16339.869281045752,
+        16025.641025641025
+      ]
+    }
+  ]
+}
