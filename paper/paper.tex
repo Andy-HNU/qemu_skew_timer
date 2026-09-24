@@ -23,26 +23,34 @@ The study also identifies a wide-IPS conversion defect.
 \end{abstract}
 
 \section{Introduction}
-Functional emulation enables unmodified system software to run on a different
-host architecture. QEMU uses dynamic translation for this purpose
-\cite{bellard2005}. Parallel execution increases the usefulness of full-system
-emulation, but execution progress and software-visible time must remain meaningfully
-related. If a guest deadline advances with host time while translated processing
-takes longer than on the target hardware, an emulated workload may miss a deadline
-that hardware would meet.
+Functional full-system emulation runs unmodified system software across host
+architectures while prioritizing execution speed and tolerating bounded timing
+error. QEMU's MTTCG enables parallel vCPU execution, whereas its
+instruction-counting mode derives virtual time from guest instructions but
+executes vCPUs in a single thread. Cycle-accurate simulators provide finer
+timing fidelity at substantially greater computational cost. Many system
+workloads use timers to enforce processing deadlines; communication-chip
+functional emulation provides a representative example. In this setting,
+guest time should reflect instruction progress at a rate calibrated to the
+target hardware. A host-driven clock can instead advance beyond the emulated
+software's processing progress, producing timeouts absent on the hardware.
 
-SkewKeeper assigns a logical time scale to executed guest instructions and
-constrains how far a fast vCPU can lead shared progress. Its goal is a
-hardware-calibrated functional-time approximation, subject to calibration across
-representative workloads. It does not model cycles, caches, pipelines, or memory
-stalls. Instruction progress supplies a stable conversion rule; the instruction
-sequence and multicore schedule themselves need not be invariant under host load.
+SkewKeeper establishes a logical instruction timeline for parallel vCPUs.
+A bounded skew window constrains each active vCPU's lead relative to the
+minimum active progress. The coordinator periodically publishes
+instruction-derived model time, while a shared visible clock applies
+momentum-weighted interpolation between publications. Read-time bounds keep
+visible time close to the model timeline, mitigating counter plateaus while
+maintaining a monotonic, cross-vCPU time base.
 
-The proposed contributions are (1) epoch-based logical progress with explicit
-idle membership, (2) a bounded parallel execution window using common TB-budget
-machinery, (3) a shared, bounded visible-time interpolator, and (4) a reproducible
-calibration and evaluation methodology. Hardware-calibrated accuracy is an
-objective of the methodology, not an established result.
+SkewKeeper combines a bounded execution window with momentum-based
+interpolation to establish a shared, instruction-derived time base for
+parallel vCPUs. Linux boot and sustained jitterentropy operation exercise
+its timer-dependent software paths, while multicore measurements place its
+execution cost alongside icount and MTTCG. Deadline-sensitive communication
+workloads retain the expected guest-time behavior as host execution capacity
+varies. The same time base extends across runtime transitions between skew
+and MTTCG through coordinated visible-time state and interpolation momentum.
 
 \section{Background and Motivation}
 \subsection{Parallel TCG and instruction counting}
