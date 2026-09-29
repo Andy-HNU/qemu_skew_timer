@@ -8,7 +8,9 @@ VPATH+=$(AARCH64_SYSTEM_SRC)
 # These objects provide the basic boot code and helper functions for all tests
 CRT_OBJS=boot.o
 
-AARCH64_TEST_SRCS=$(wildcard $(AARCH64_SYSTEM_SRC)/*.c)
+# skew-suite.py builds its guests, Linux init programs and host plugins separately.
+AARCH64_TEST_SRCS=$(filter-out $(AARCH64_SYSTEM_SRC)/skew-%, \
+                             $(wildcard $(AARCH64_SYSTEM_SRC)/*.c))
 AARCH64_TESTS = $(patsubst $(AARCH64_SYSTEM_SRC)/%.c, %, $(AARCH64_TEST_SRCS))
 
 CRT_PATH=$(AARCH64_SYSTEM_SRC)

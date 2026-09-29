@@ -36,6 +36,7 @@ tests = {
   'test-qdist': [],
   'test-qht': [],
   'test-bitops': [],
+  'test-exec-budget': [],
   'test-bitcnt': [],
   'test-qgraph': ['../qtest/libqos/qgraph.c'],
   'check-qom-interface': [qom],

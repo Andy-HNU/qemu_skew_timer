@@ -6,7 +6,10 @@
 
 /* Helpers for instruction counting code generation.  */
 
-static TCGOp *icount_start_insn;
+/* MTTCG can generate budgeted TBs concurrently. Keep the placeholder
+ * in its generating thread so gen_tb_end cannot patch another
+ * context with a temporary belonging to this one. */
+static __thread TCGOp *icount_start_insn;
 
 static inline void gen_io_start(void)
 {

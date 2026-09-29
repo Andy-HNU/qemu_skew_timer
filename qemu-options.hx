@@ -183,6 +183,7 @@ DEF("accel", HAS_ARG, QEMU_OPTION_accel,
     "                kernel-irqchip=on|off|split controls accelerated irqchip support (default=on)\n"
     "                kvm-shadow-mem=size of KVM shadow MMU in bytes\n"
     "                split-wx=on|off (enable TCG split w^x mapping)\n"
+    "                skew=ns,skew-ips=n,skew-update=ns,skew-defer=on|off\n"
     "                tb-size=n (TCG translation block cache size)\n"
     "                dirty-ring-size=n (KVM dirty ring GFN count, default 0)\n"
     "                notify-vmexit=run|internal-error|disable,notify-window=n (enable notify VM exit and set notify window, x86 only)\n"
@@ -215,6 +216,27 @@ SRST
         buffer. Some operating systems require this to be enabled, and in
         such a case this will default on. On other operating systems, this
         will default off, but one may enable this for testing or debugging.
+
+    ``skew=ns,skew-ips=n,skew-update=ns,skew-defer=on|off``
+        Configure an instruction-driven sliding-window clock for MTTCG.
+        ``skew`` is the maximum per-vCPU lead in nanoseconds (default 0,
+        disabled). ``skew-ips`` sets instructions per simulated second
+        (default 2000000000, maximum 1000000000000). ``skew-update`` is
+        the host coordinator polling interval (default 100000 ns), rather
+        than a virtual clock step or timer latency bound. Intervals must
+        be positive and at most one second; the lead window must cover
+        at least one instruction. Execution budgets are bounded by the
+        remaining window and the 16-bit decrementer capacity (65535).
+
+        Guest CPUs share a monotonic interpolated visible time bounded
+        by the window around the minimum active CPU instruction progress.
+        Idle CPUs leave the active set; when all CPUs are idle, time can
+        advance to the next virtual timer. Time freezes with the VM.
+        ``skew-defer=on`` boots with MTTCG time and enables later QMP
+        ``skew-start`` / ``skew-stop`` round trips, preserving visible
+        time and the VM's running or paused state. Choose a window smaller
+        than the guest timeout margin. Migration, snapshots, record/replay,
+        ``-icount`` and single-thread TCG are unsupported with skew.
 
     ``tb-size=n``
         Controls the size (in MiB) of the TCG translation block cache.

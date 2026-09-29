@@ -61,6 +61,8 @@ void icount_start_warp_timer(void);
 void icount_account_warp_timer(void);
 void icount_notify_exit(void);
 
+extern const struct TCGExecutionBudgetOps icount_budget_ops;
+
 /*
  * CPU Ticks and Clock
  */

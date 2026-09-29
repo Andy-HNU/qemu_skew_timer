@@ -23,6 +23,8 @@
 #include "exec/exec-all.h"
 #include "exec/translate-all.h"
 #include "sysemu/tcg.h"
+#include "sysemu/runstate.h"
+#include "qemu/main-loop.h"
 #include "tcg/tcg.h"
 #include "tb-hash.h"
 #include "tb-context.h"
@@ -113,6 +115,21 @@ done:
         qemu_plugin_flush_cb();
     }
 }
+
+#ifndef CONFIG_USER_ONLY
+void tb_flush__exclusive_or_serial(void)
+{
+    CPUState *cpu;
+
+    assert(qemu_mutex_iothread_locked());
+    assert(!runstate_is_running());
+    CPU_FOREACH(cpu) {
+        assert(cpu->stopped);
+    }
+    do_tb_flush(NULL, RUN_ON_CPU_HOST_INT(
+                    qatomic_mb_read(&tb_ctx.tb_flush_count)));
+}
+#endif
 
 void tb_flush(CPUState *cpu)
 {

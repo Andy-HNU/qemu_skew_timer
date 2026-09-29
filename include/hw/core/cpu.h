@@ -354,8 +354,26 @@ struct CPUState {
     /* updates protected by BQL */
     uint32_t interrupt_request;
     int singlestep_enabled;
+    /* 公共预算回调表在 vCPU 初始化时选定，执行期间不切换。 */
+    const struct TCGExecutionBudgetOps *execution_budget_ops;
+    /* 以下长预算与扩展额度仅属于传统 icount 时间模型。 */
     int64_t icount_budget;
     int64_t icount_extra;
+    /* MTTCG skew clock: raw is atomic; membership and bases use the BQL. */
+    /* 原子发布的累计完成指令数；重新加入活动集合时不清零。 */
+    uint64_t skew_raw_icount;
+    /* skew 本轮发放的额度；与 icount_budget/icount_extra 完全独立。 */
+    uint32_t skew_budget;
+    /* 发放预算时的 global 快照，用于无锁结算中的窗口越界检测。 */
+    uint64_t skew_budget_global;
+    /* 本次加入时的 raw 快照，用于扣除先前执行历史。 */
+    uint64_t skew_raw_base;
+    /* 本次加入时对齐的全局进度；logical = base + raw - raw_base。 */
+    uint64_t skew_logical_base;
+    /* 是否参与最小进度计算；因领先而等待的 CPU 仍属于活跃成员。 */
+    bool skew_active;
+    /* 是否在窗口边界睡眠，协调器据此选择需要唤醒的线程。 */
+    bool skew_waiting;
     uint64_t random_seed;
     sigjmp_buf jmp_env;
 

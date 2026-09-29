@@ -27,6 +27,7 @@
 #include "sysemu/tcg.h"
 #include "sysemu/replay.h"
 #include "sysemu/cpu-timers.h"
+#include "exec/skew.h"
 #include "qemu/main-loop.h"
 #include "qemu/notify.h"
 #include "qemu/guest-random.h"
@@ -89,10 +90,23 @@ static void *mttcg_cpu_thread_fn(void *arg)
     cpu->exit_request = 1;
 
     do {
+        if (skew_enabled()) {
+            skew_cpu_idle(cpu);
+        }
         if (cpu_can_run(cpu)) {
             int r;
+            if (skew_enabled()) {
+                skew_cpu_prepare(cpu);
+            }
             qemu_mutex_unlock_iothread();
             r = tcg_cpus_exec(cpu);
+            if (skew_enabled() && r == EXCP_ATOMIC) {
+                cpu_exec_step_atomic(cpu);
+                r = EXCP_INTERRUPT;
+            }
+            if (skew_enabled()) {
+                skew_cpu_account(cpu);
+            }
             qemu_mutex_lock_iothread();
             switch (r) {
             case EXCP_DEBUG:
@@ -117,9 +131,16 @@ static void *mttcg_cpu_thread_fn(void *arg)
                 /* Ignore everything else? */
                 break;
             }
+            if (skew_enabled()) {
+                skew_cpu_wait(cpu);
+            }
         }
 
         qatomic_mb_set(&cpu->exit_request, 0);
+        if (skew_enabled()) {
+            /* v7 waits here, before the next iteration can remove idle CPUs. */
+            skew_cpu_idle(cpu);
+        }
         qemu_wait_io_event(cpu);
     } while (!cpu->unplug || cpu_can_run(cpu));
 
@@ -141,6 +162,9 @@ void mttcg_start_vcpu_thread(CPUState *cpu)
 
     g_assert(tcg_enabled());
     tcg_cpu_init_cflags(cpu, current_machine->smp.max_cpus > 1);
+    if (skew_configured()) {
+        skew_register_cpu(cpu);
+    }
 
     cpu->thread = g_new0(QemuThread, 1);
     cpu->halt_cond = g_malloc0(sizeof(QemuCond));

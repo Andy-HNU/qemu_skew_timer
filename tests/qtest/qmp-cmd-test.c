@@ -44,6 +44,9 @@ static int query_error_class(const char *cmd)
         /* Likewise, and require special QEMU command-line arguments: */
         { "query-acpi-ospm-status", ERROR_CLASS_GENERIC_ERROR },
         { "query-balloon", ERROR_CLASS_DEVICE_NOT_ACTIVE },
+        { "query-skew-clock", ERROR_CLASS_GENERIC_ERROR },
+        { "skew-start", ERROR_CLASS_GENERIC_ERROR },
+        { "skew-stop", ERROR_CLASS_GENERIC_ERROR },
         { "query-hotpluggable-cpus", ERROR_CLASS_GENERIC_ERROR },
         { "query-vm-generation-id", ERROR_CLASS_GENERIC_ERROR },
 #ifndef CONFIG_PROFILER

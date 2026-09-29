@@ -2918,6 +2918,12 @@ void arm_gt_ptimer_cb(void *opaque)
 {
     ARMCPU *cpu = opaque;
 
+    trace_arm_gt_timer_expire(CPU(cpu)->cpu_index, GTIMER_PHYS,
+                             cpu->env.cp15.c14_timer[GTIMER_PHYS].cval,
+                             gt_get_countervalue(&cpu->env),
+                             gt_cntfrq_period_ns(cpu),
+                             qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL));
+
     gt_recalc_timer(cpu, GTIMER_PHYS);
 }
 

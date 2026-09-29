@@ -29,6 +29,8 @@
 #include "sysemu/tcg.h"
 #include "sysemu/replay.h"
 #include "sysemu/cpu-timers.h"
+#include "exec/exec-budget.h"
+#include "exec/skew.h"
 #include "qemu/main-loop.h"
 #include "qemu/guest-random.h"
 #include "exec/exec-all.h"
@@ -46,7 +48,10 @@ void tcg_cpu_init_cflags(CPUState *cpu, bool parallel)
 {
     uint32_t cflags = cpu->cluster_index << CF_CLUSTER_SHIFT;
     cflags |= parallel ? CF_PARALLEL : 0;
-    cflags |= icount_enabled() ? CF_USE_ICOUNT : 0;
+    assert(!icount_enabled() || !skew_enabled());
+    cpu->execution_budget_ops = icount_enabled() ? &icount_budget_ops :
+                                skew_enabled() ? &skew_budget_ops : NULL;
+    cflags |= exec_budget_enabled(cpu) ? CF_USE_ICOUNT : 0;
     cpu->tcg_cflags = cflags;
 }
 
@@ -190,6 +195,10 @@ static void tcg_accel_ops_init(AccelOpsClass *ops)
         ops->create_vcpu_thread = mttcg_start_vcpu_thread;
         ops->kick_vcpu_thread = mttcg_kick_vcpu_thread;
         ops->handle_interrupt = tcg_handle_interrupt;
+        if (skew_configured()) {
+            ops->get_virtual_clock = skew_get_clock;
+            ops->get_elapsed_ticks = skew_get_clock;
+        }
     } else {
         ops->create_vcpu_thread = rr_start_vcpu_thread;
         ops->kick_vcpu_thread = rr_kick_vcpu_thread;

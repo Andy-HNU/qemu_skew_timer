@@ -35,6 +35,7 @@
 #include "qemu/units.h"
 #if !defined(CONFIG_USER_ONLY)
 #include "hw/boards.h"
+#include "exec/skew.h"
 #endif
 #include "internal.h"
 
@@ -44,6 +45,8 @@ struct TCGState {
     bool mttcg_enabled;
     int splitwx_enabled;
     unsigned long tb_size;
+    uint64_t skew_ns, skew_ips, skew_update_ns;
+    bool skew_defer;
 };
 typedef struct TCGState TCGState;
 
@@ -94,11 +97,38 @@ static bool default_mttcg_enabled(void)
     }
 }
 
+#ifndef CONFIG_USER_ONLY
+static bool tcg_get_skew_defer(Object *obj, Error **errp)
+{
+    return TCG_STATE(obj)->skew_defer;
+}
+
+static void tcg_set_skew_defer(Object *obj, bool value, Error **errp)
+{
+    TCG_STATE(obj)->skew_defer = value;
+}
+#endif
+
 static void tcg_accel_instance_init(Object *obj)
 {
     TCGState *s = TCG_STATE(obj);
 
     s->mttcg_enabled = default_mttcg_enabled();
+
+    /* 默认每模拟秒 20 亿条指令、每 100 微秒协调一次；skew_ns 为零时关闭。 */
+    s->skew_ips = 2000000000;
+    s->skew_update_ns = 100000;
+#ifndef CONFIG_USER_ONLY
+    /* 系统模拟的 -accel 属性入口；用户态模拟不注册这些参数。 */
+    object_property_add_uint64_ptr(obj, "skew", &s->skew_ns,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_add_uint64_ptr(obj, "skew-ips", &s->skew_ips,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_add_uint64_ptr(obj, "skew-update", &s->skew_update_ns,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_add_bool(obj, "skew-defer", tcg_get_skew_defer,
+                             tcg_set_skew_defer);
+#endif
 
     /* If debugging enabled, default "auto on", otherwise off. */
 #if defined(CONFIG_DEBUG_TCG) && !defined(CONFIG_USER_ONLY)
@@ -132,6 +162,27 @@ static int tcg_init_machine(MachineState *ms)
      * initialize the prologue now.
      */
     tcg_prologue_init(tcg_ctx);
+    /*
+     * 非零窗口才启用；要求明确的 MTTCG 多线程模式，并排除 icount/replay。
+     * 初始化成功后注册机器级只读 skew-time，便于 QMP 观测。
+     */
+    if (s->skew_defer && !s->skew_ns) {
+        error_report("skew-defer requires a nonzero skew window");
+        return -EINVAL;
+    }
+    if (s->skew_ns) {
+        if (!default_mttcg_enabled() || !s->mttcg_enabled ||
+            icount_enabled() || replay_mode != REPLAY_MODE_NONE) {
+            error_report("skew requires MTTCG without -icount "
+                         "or record/replay");
+            return -EINVAL;
+        }
+        if (!skew_init(s->skew_ns, s->skew_ips, s->skew_update_ns,
+                       s->skew_defer, &error_fatal)) {
+            return -EINVAL;
+        }
+        skew_register_clock(OBJECT(ms));
+    }
 #endif
 
     return 0;

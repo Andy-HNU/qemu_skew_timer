@@ -53,6 +53,7 @@
 #include "qemu/main-loop.h"
 #include "qemu/cacheinfo.h"
 #include "exec/log.h"
+#include "exec/exec-budget.h"
 #include "sysemu/cpus.h"
 #include "sysemu/cpu-timers.h"
 #include "sysemu/tcg.h"
@@ -300,12 +301,12 @@ void cpu_restore_state_from_tb(CPUState *cpu, TranslationBlock *tb,
     }
 
     if (tb_cflags(tb) & CF_USE_ICOUNT) {
-        assert(icount_enabled());
+        assert(exec_budget_enabled(cpu));
         /*
          * Reset the cycle counter to the start of the block and
          * shift if to the number of actually executed instructions.
          */
-        cpu_neg(cpu)->icount_decr.u16.low += insns_left;
+        exec_budget_set(cpu, exec_budget_remaining(cpu) + insns_left);
     }
 
     cpu->cc->tcg_ops->restore_state_to_opc(cpu, tb, data);

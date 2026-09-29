@@ -32,6 +32,7 @@
 #include "qemu/timer.h"
 #include "qemu/rcu.h"
 #include "exec/log.h"
+#include "exec/exec-budget.h"
 #include "qemu/main-loop.h"
 #if defined(TARGET_I386) && !defined(CONFIG_USER_ONLY)
 #include "hw/i386/apic.h"
@@ -797,6 +798,7 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
 #else
         else if (interrupt_request & CPU_INTERRUPT_RESET) {
             replay_interrupt();
+            exec_budget_before_reset(cpu);
             cpu_reset(cpu);
             qemu_mutex_unlock_iothread();
             return true;
@@ -845,9 +847,9 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
 
     /* Finally, check if we need to exit to the main loop.  */
     if (unlikely(qatomic_read(&cpu->exit_request))
-        || (icount_enabled()
-            && (cpu->cflags_next_tb == -1 || cpu->cflags_next_tb & CF_USE_ICOUNT)
-            && cpu_neg(cpu)->icount_decr.u16.low + cpu->icount_extra == 0)) {
+        || ((cpu->cflags_next_tb == -1 ||
+             cpu->cflags_next_tb & CF_USE_ICOUNT)
+            && exec_budget_exhausted(cpu))) {
         qatomic_set(&cpu->exit_request, 0);
         if (cpu->exception_index == -1) {
             cpu->exception_index = EXCP_INTERRUPT;
@@ -884,15 +886,8 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
         return;
     }
 
-    /* Instruction counter expired.  */
-    assert(icount_enabled());
-#ifndef CONFIG_USER_ONLY
-    /* Ensure global icount has gone forward */
-    icount_update(cpu);
-    /* Refill decrementer and continue execution.  */
-    insns_left = MIN(0xffff, cpu->icount_budget);
-    cpu_neg(cpu)->icount_decr.u16.low = insns_left;
-    cpu->icount_extra = cpu->icount_budget - insns_left;
+    /* The selected model settles and refills its execution budget. */
+    insns_left = exec_budget_expired(cpu);
 
     /*
      * If the next tb has more instructions than we have left to
@@ -901,10 +896,8 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
      */
     if (insns_left > 0 && insns_left < tb->icount)  {
         assert(insns_left <= CF_COUNT_MASK);
-        assert(cpu->icount_extra == 0);
         cpu->cflags_next_tb = (tb->cflags & ~CF_COUNT_MASK) | insns_left;
     }
-#endif
 }
 
 /* main execution loop */

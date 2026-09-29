@@ -11,3 +11,5 @@ arm_gt_cntvoff_write(uint64_t value) "gt_cntvoff_write: value 0x%" PRIx64
 
 # kvm.c
 kvm_arm_fixup_msi_route(uint64_t iova, uint64_t gpa) "MSI iova = 0x%"PRIx64" is translated into 0x%"PRIx64
+
+arm_gt_timer_expire(int cpu, int timer, uint64_t cval, uint64_t count, unsigned period, int64_t ns) "cpu=%d timer=%d cval=%"PRIu64" count=%"PRIu64" period=%u ns=%"PRId64
