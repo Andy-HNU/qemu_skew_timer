@@ -48,13 +48,18 @@ static aligned_int64_t mttcg_start_clock;
 #define SKEW_FEEDBACK_DEN 100
 #define SKEW_ACTIVE_SLOPE_FLOOR (SKEW_SLOPE_ONE / 256)
 static aligned_int64_t model_ns, visible_ns;
-static aligned_int64_t anchor_visible_ns, last_update_elapsed_ns;
+/* 插值锚点可在 prepare 提升斜率时重建，不改变动量采样区间。 */
+static aligned_int64_t anchor_visible_ns, visible_anchor_elapsed_ns;
 static aligned_uint64_t visible_slope_q32;
+/* BQL 保护：采样时间与指令基线只在协调采样或阶段初始化时成对更新。 */
+static int64_t sample_anchor_elapsed_ns;
 static uint64_t prev_global_icount;
 static uint64_t momentum_history_slope[SKEW_MOMENTUM_HISTORY];
 static unsigned momentum_history_pos, momentum_history_count;
 /* BQL 串行化写者；切换时读者必须看到同一组模式、累计量和基准。 */
 static QemuSeqLock clock_seqlock;
+/* BQL protected, including intervals where vm_stop drops the BQL. */
+static bool clock_switching;
 /* 全 CPU 空闲时累加的跳时偏移，不伪造任何 CPU 的已执行指令数。 */
 static int64_t warp_ns;
 /* 用宿主 REALTIME 调度协调器，避免虚拟时钟停滞时无法唤醒协调逻辑。 */
@@ -81,7 +86,7 @@ static uint64_t skew_ratio_q32(uint64_t numerator, uint64_t denominator)
                SKEW_SLOPE_ONE);
 }
 
-/* QOM getter 通过原子时钟读取接口返回纳秒值，不触发时间推进。 */
+/* QOM getter 返回共享可见纳秒值，可推进插值高水位，不运行协调器。 */
 static void skew_read_clock(Object *obj, Visitor *v, const char *name,
                             void *opaque, Error **errp)
 {
@@ -122,7 +127,8 @@ void skew_register_cpu(CPUState *cpu)
  * Within one skew epoch model_ns never decreases and window_ns is fixed:
  * a late prediction bounded by the old model + window also fits the new
  * upper bound.  The coordinator supplies the new lower bound.  Epoch
- * initialization/rebasing remains a separate, stopped-vCPU operation.
+ * initialization/rebasing runs with all vCPUs stopped and the BQL held.
+ * vCPU publishers have finished; BQL serializes the coordinator and queries.
  */
 static int64_t skew_publish_visible(int64_t candidate)
 {
@@ -136,7 +142,7 @@ static int64_t skew_publish_visible(int64_t candidate)
 }
 
 /* 全部 CPU 和设备共用同一时间线；切换前使用可随 VM 暂停的原生时钟。 */
-static int64_t skew_visible_clock(void)
+static int64_t skew_visible_clock(int64_t elapsed_now)
 {
     int64_t anchor, elapsed_anchor, model, predicted, lower, upper, next;
     uint64_t slope;
@@ -145,11 +151,11 @@ static int64_t skew_visible_clock(void)
     do {
         seq = seqlock_read_begin(&clock_seqlock);
         anchor = qatomic_read_i64(&anchor_visible_ns);
-        elapsed_anchor = qatomic_read_i64(&last_update_elapsed_ns);
+        elapsed_anchor = qatomic_read_i64(&visible_anchor_elapsed_ns);
         model = qatomic_read_i64(&model_ns);
         slope = qatomic_read_u64(&visible_slope_q32);
         predicted = anchor +
-                    (((__uint128_t)MAX(cpu_get_clock() - elapsed_anchor, 0) *
+                    (((__uint128_t)MAX(elapsed_now - elapsed_anchor, 0) *
                       slope) >> SKEW_SLOPE_SHIFT);
         lower = MAX(model - (int64_t)window_ns, 0);
         upper = model + window_ns;
@@ -161,7 +167,8 @@ static int64_t skew_visible_clock(void)
     return next;
 }
 
-int64_t skew_get_clock(void)
+/* Called by vCPU execution or a BQL-serialized clock consumer. */
+static int64_t skew_clock_at(int64_t elapsed_now)
 {
     unsigned seq;
     int64_t now;
@@ -169,13 +176,21 @@ int64_t skew_get_clock(void)
     do {
         seq = seqlock_read_begin(&clock_seqlock);
         if (skew_enabled()) {
-            now = skew_visible_clock();
+            now = skew_visible_clock(elapsed_now);
         } else {
             now = qatomic_read_i64(&mttcg_elapsed_ns) +
                   qatomic_read_i64(&skew_elapsed_ns);
-            now += cpu_get_clock() - qatomic_read_i64(&mttcg_start_clock);
+            now += elapsed_now - qatomic_read_i64(&mttcg_start_clock);
         }
     } while (seqlock_read_retry(&clock_seqlock, seq));
+    return now;
+}
+
+int64_t skew_get_clock(void)
+{
+    int64_t now;
+
+    now = skew_clock_at(cpu_get_clock());
     return now;
 }
 
@@ -245,17 +260,23 @@ static uint64_t logical_count(CPUState *cpu)
            (qatomic_read_u64(&cpu->skew_raw_icount) - cpu->skew_raw_base);
 }
 
-static void skew_momentum_reset(int64_t now)
+static void skew_momentum_rebase(int64_t now, int64_t elapsed_now)
 {
     memset(momentum_history_slope, 0, sizeof(momentum_history_slope));
     momentum_history_pos = 0;
     momentum_history_count = 0;
     prev_global_icount = 0;
+    sample_anchor_elapsed_ns = elapsed_now;
     qatomic_set_i64(&model_ns, now);
     qatomic_set_i64(&visible_ns, now);
     qatomic_set_i64(&anchor_visible_ns, now);
-    qatomic_set_i64(&last_update_elapsed_ns, cpu_get_clock());
+    qatomic_set_i64(&visible_anchor_elapsed_ns, elapsed_now);
     qatomic_set_u64(&visible_slope_q32, 0);
+}
+
+static void skew_momentum_reset(int64_t now)
+{
+    skew_momentum_rebase(now, cpu_get_clock());
 }
 
 static uint64_t skew_momentum_add(uint64_t delta_icount, uint64_t delta_t_ns)
@@ -323,7 +344,7 @@ static void skew_update(void *opaque)
 
     assert(bql_locked());
     /* VM 暂停时不推进时间；运行状态回调会在恢复时重新安排协调器。 */
-    if (!skew_enabled() || !runstate_is_running()) {
+    if (clock_switching || !skew_enabled() || !runstate_is_running()) {
         return;
     }
 
@@ -375,9 +396,10 @@ static void skew_update(void *opaque)
      */
     visible = skew_get_clock();
     elapsed_now = cpu_get_clock();
-    delta_t_ns = MAX(elapsed_now -
-                     qatomic_read_i64(&last_update_elapsed_ns), 0);
+    /* delta_t 和 delta_icount 必须覆盖同一段协调采样区间。 */
+    delta_t_ns = MAX(elapsed_now - sample_anchor_elapsed_ns, 0);
     delta_icount = global_icount - prev_global_icount;
+    sample_anchor_elapsed_ns = elapsed_now;
     prev_global_icount = global_icount;
     slope = skew_momentum_add(delta_icount, delta_t_ns);
     slope = skew_feedback_slope(slope, visible - now, delta_t_ns);
@@ -395,7 +417,7 @@ static void skew_update(void *opaque)
     /* Keep a reader's later publication; anchor at the value we committed. */
     visible = skew_publish_visible(visible);
     qatomic_set_i64(&anchor_visible_ns, visible);
-    qatomic_set_i64(&last_update_elapsed_ns, elapsed_now);
+    qatomic_set_i64(&visible_anchor_elapsed_ns, elapsed_now);
     qatomic_set_u64(&visible_slope_q32, slope);
     qatomic_set_i64(&skew_elapsed_ns, visible - mttcg_elapsed_ns);
     seqlock_write_end(&clock_seqlock);
@@ -420,7 +442,7 @@ static void skew_update(void *opaque)
 /* 暂停删除宿主定时器，恢复立即安排一次协调，暂停期间虚拟时间冻结。 */
 static void skew_vm_state(void *opaque, bool running, RunState state)
 {
-    if (running && skew_enabled()) {
+    if (running && skew_enabled() && !clock_switching) {
         timer_mod(coordinator, qemu_clock_get_ns(QEMU_CLOCK_REALTIME));
     } else {
         timer_del(coordinator);
@@ -462,6 +484,63 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
     return true;
 }
 
+/* 全核停稳且旧预算已由各 vCPU 结算；保留通用退出/中断通知。 */
+static void skew_cpu_switch(CPUState *cpu, bool enable)
+{
+    assert(bql_locked());
+    assert(!runstate_is_running());
+    assert(cpu->skew_budget == 0);
+    assert(exec_budget_remaining(cpu) == 0);
+
+    qatomic_set_u64(&cpu->skew_raw_icount, 0);
+    cpu->skew_raw_base = 0;
+    cpu->skew_logical_base = 0;
+    cpu->skew_budget_global = 0;
+    cpu->skew_budget = 0;
+    cpu->skew_active = false;
+    cpu->skew_waiting = false;
+    exec_budget_set(cpu, 0);
+    cpu->execution_budget_ops = enable ? &skew_budget_ops : NULL;
+    if (enable) {
+        tcg_cflags_set(cpu, CF_USE_ICOUNT);
+    } else {
+        cpu->tcg_cflags &= ~CF_USE_ICOUNT;
+    }
+    cpu->cflags_next_tb = -1;
+}
+
+/*
+ * Settle the old visible clock at one frozen elapsed sample, then start a
+ * fresh epoch at that exact value. Never force unpublished instruction tails
+ * into shared time or carry the old visible/model bias as instruction debt.
+ * The caller has stopped all vCPUs and holds the BQL; no old publisher can
+ * cross this rebase. Normal clock reads need no registration or drain gate.
+ */
+static void skew_clock_switch(bool enable)
+{
+    int64_t elapsed_now, visible;
+
+    assert(bql_locked());
+    assert(!runstate_is_running());
+    elapsed_now = cpu_get_clock();
+    visible = skew_clock_at(elapsed_now);
+    seqlock_write_begin(&clock_seqlock);
+    start_ns = visible;
+    if (enable) {
+        qatomic_set_i64(&mttcg_elapsed_ns,
+                       visible - qatomic_read_i64(&skew_elapsed_ns));
+    } else {
+        qatomic_set_i64(&skew_elapsed_ns,
+                       visible - qatomic_read_i64(&mttcg_elapsed_ns));
+    }
+    qatomic_set_i64(&mttcg_start_clock, elapsed_now);
+    warp_ns = 0;
+    global_icount = 0;
+    skew_momentum_rebase(visible, elapsed_now);
+    qatomic_set(&use_skew, enable);
+    seqlock_write_end(&clock_seqlock);
+}
+
 /* 双向切换只搬移时间贡献；停核结算后的领先尾部不强行推进共享时间。 */
 static SkewClockInfo *skew_switch(bool enable, Error **errp)
 {
@@ -474,6 +553,10 @@ static SkewClockInfo *skew_switch(bool enable, Error **errp)
         error_setg(errp, "Configure -accel tcg,thread=multi,skew=NS first");
         return NULL;
     }
+    if (clock_switching) {
+        error_setg(errp, "Clock mode switch already in progress");
+        return NULL;
+    }
     if (skew_enabled() == enable) {
         return qmp_query_skew_clock(errp);
     }
@@ -483,52 +566,32 @@ static SkewClockInfo *skew_switch(bool enable, Error **errp)
         error_setg(errp, "Clock switch requires running, paused or prelaunch state");
         return NULL;
     }
+    clock_switching = true;
+    timer_del(coordinator);
     if (running) {
         ret = vm_stop(RUN_STATE_PAUSED);
         if (ret < 0) {
+            clock_switching = false;
+            skew_vm_state(NULL, runstate_is_running(), runstate_get());
             error_setg_errno(errp, -ret, "Could not pause VM for clock switch");
             return NULL;
         }
     }
-    /* 两种模式读到的时间均已冻结；保存切换点供新阶段计时。 */
-    start_ns = skew_get_clock();
-    timer_del(coordinator);
-    seqlock_write_begin(&clock_seqlock);
-    if (enable) {
-        qatomic_set_i64(&mttcg_elapsed_ns,
-                       start_ns - qatomic_read_i64(&skew_elapsed_ns));
-        skew_momentum_reset(start_ns);
-    } else {
-        /* skew_elapsed 已是最终发布值，不把未发布的 CPU 尾部再加进来。 */
-        qatomic_set_i64(&skew_elapsed_ns,
-                        start_ns - qatomic_read_i64(&mttcg_elapsed_ns));
-        qatomic_set_i64(&mttcg_start_clock, cpu_get_clock());
-        qatomic_set_i64(&model_ns, start_ns);
-        qatomic_set_i64(&visible_ns, start_ns);
-        qatomic_set_u64(&visible_slope_q32, 0);
+    /* vm_stop may yield while draining block I/O; a concurrent cont must
+     * not turn a paused-state assumption into edits of live CPU state. */
+    if (running && !runstate_check(RUN_STATE_PAUSED)) {
+        clock_switching = false;
+        skew_vm_state(NULL, runstate_is_running(), runstate_get());
+        error_setg(errp, "VM state changed while pausing for clock switch");
+        return NULL;
     }
-    qatomic_set(&use_skew, enable);
-    seqlock_write_end(&clock_seqlock);
-    warp_ns = 0;
-    global_icount = 0;
     CPU_FOREACH(cpu) {
-        qatomic_set_u64(&cpu->skew_raw_icount, 0);
-        cpu->skew_raw_base = 0;
-        cpu->skew_logical_base = 0;
-        cpu->skew_budget_global = 0;
-        cpu->skew_budget = 0;
-        cpu->skew_active = false;
-        cpu->skew_waiting = false;
-        exec_budget_set(cpu, 0);
-        cpu->execution_budget_ops = enable ? &skew_budget_ops : NULL;
-        if (enable) {
-            tcg_cflags_set(cpu, CF_USE_ICOUNT);
-        } else {
-            cpu->tcg_cflags &= ~CF_USE_ICOUNT;
-        }
-        cpu->cflags_next_tb = -1;
+        skew_cpu_switch(cpu, enable);
     }
+    /* Finish TB/plugin callbacks in the old clock phase before rebasing. */
     tb_flush__exclusive_or_serial();
+    skew_clock_switch(enable);
+    clock_switching = false;
     qemu_clock_notify(QEMU_CLOCK_VIRTUAL);
     if (running) {
         vm_start();
@@ -580,7 +643,7 @@ void skew_cpu_prepare(CPUState *cpu)
             SKEW_ACTIVE_SLOPE_FLOOR) {
             seqlock_write_begin(&clock_seqlock);
             qatomic_set_i64(&anchor_visible_ns, visible);
-            qatomic_set_i64(&last_update_elapsed_ns, cpu_get_clock());
+            qatomic_set_i64(&visible_anchor_elapsed_ns, cpu_get_clock());
             qatomic_set_u64(&visible_slope_q32,
                             SKEW_ACTIVE_SLOPE_FLOOR);
             seqlock_write_end(&clock_seqlock);

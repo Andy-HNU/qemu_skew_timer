@@ -5,21 +5,22 @@
 ## 两个累计量
 
 - `mttcg_elapsed_ns`：已经结算的 MTTCG 阶段累计贡献。
-- `skew_elapsed_ns`：所有 skew 阶段已经发布的累计贡献，包含空闲跳时。
+- `skew_elapsed_ns`：skew 阶段的累计贡献，包含空闲跳时与 visible 插值；协调器保存最近结算值，查询和退出按当前 visible 补齐。
 
 MTTCG 读取时补上当前阶段尚未结算的增量：
 
 ```text
 MTTCG: virtual = mttcg_elapsed + skew_elapsed
                 + cpu_get_clock() - mttcg_start_clock
-skew:  virtual = mttcg_elapsed + skew_elapsed
+skew:  virtual = shared visible time
+       current skew elapsed = virtual - mttcg_elapsed
 ```
 
-进入 skew 时，把 MTTCG 当前阶段增量归入累计量；记下当前总时间 `start_ns`，本阶段 global、CPU 进度和 warp 从零开始。协调器按 `start_ns + global_icount × 1e9 / ips + warp` 更新共享时间，并将新发布的增量归入 skew 累计量。
+进入 skew 时，把 MTTCG 当前阶段增量归入累计量；记下当前总时间 `start_ns`，本阶段 global、CPU 进度和 warp 从零开始。协调器按 `start_ns + global_icount × 1e9 / ips + warp` 更新 model；visible 在 model ± window 内插值。进入时 model、visible 和插值锚点同为最终切换值，历史和两个时间锚点按新阶段重建。
 
-退出 skew 时保留最终已发布的累计量，令 `mttcg_start_clock = cpu_get_clock()`。各 CPU 的预算在停核过程中正常结算，但尚未进入共享时间的领先尾部不强行加入时间。global、raw、logical 基准、预算、active/waiting 全部清零；两个累计纳秒量保留。MTTCG 从相同总时间继续流逝。
+退出 skew 时先停稳所有 vCPU，再持有 BQL 用同一个冻结 elapsed 采样求出最终 visible，补齐插值贡献，令 `mttcg_start_clock = elapsed`。两个方向都清空历史并重建插值与采样锚点。各 CPU 的预算在停核过程中正常结算，但尚未进入共享时间的领先尾部不强行加入时间。global、raw、logical 基准、预算、active/waiting 全部清零；两个累计纳秒量保留。MTTCG 从相同总时间继续流逝。
 
-切换时先暂停所有 vCPU，再改时间基准和执行预算状态、清空旧 TB。MTTCG 期间不运行 skew 协调器，不安装执行预算回调，不保留 TB 计数标志。共享时钟读者用 seqlock 获取一致的模式和时间基准，防止读到切换中间状态。
+切换时先停止协调器并暂停所有 vCPU，等旧预算由各核结算；随后准备预算状态、清空旧 TB，最后持有 BQL 结算旧 visible 并提交新时钟，恢复运行才启动协调器。MTTCG 期间不运行 skew 协调器，不安装执行预算回调，不保留 TB 计数标志。共享时钟读者用 seqlock 获取一致的模式和时间基准，防止读到切换中间状态。旧阶段 vCPU 的 CAS 已在 stopped 前完成，协调器和 QMP/QOM 查询由 BQL 串行化。getter 保留原有插值/CAS-max，不增加读者登记或切换等待操作。
 
 已设置定时器的绝对截止时间不变。运行中的 VM 自动恢复并产生 STOP/RESUME 事件；暂停或 prelaunch 的 VM 继续保持停止。同模式重复命令不重置状态。停止 VM 失败时命令报错，VM 可能保持暂停。
 
@@ -65,7 +66,7 @@ MTTCG 启动 → /init jitter 初始化
  → skew → MTTCG → skew → MTTCG → 正常关机
 ```
 
-两条绑定到不同 CPU 的线程跨越全部切换持续计算并读取 CNTVCT，检测时间回退。每段额外检查跨核迁移后的顺序读时钟、8 次 1 ms 定时休眠，以及切换前设置的 100 ms timerfd 在切换后到期。每段 skew 运行期间查询两次 CPU 状态。
+两条绑定到不同 CPU 的线程跨越全部切换持续计算并读取 CNTVCT，检测时间回退。每段额外检查跨核迁移后的顺序读时钟、8 次 1 ms 定时休眠，以及切换前设置的 100 ms timerfd 在切换后到期。每段 skew 运行期间查询两次 CPU 状态；运行中 raw 不包括当前预算，暂停切换在旧模式停稳的边界检查双核已结算进度。
 
 复现需要 AArch64 静态 libc 交叉工具链、cpio、匹配的内核和 jitter 模块（依赖编入内核）。本机采用 Debian `linux-image-6.1.0-50-cloud-arm64-unsigned_6.1.176-1_arm64.deb`，用 `dpkg-deb -x kernel.deb kernel` 解包，无需安装进宿主。
 
@@ -114,3 +115,17 @@ Debian Linux 6.1.176，2 vCPU、512 MiB、cortex-a57、GICv3；窗口 1 ms、2 G
 原始结果位于 `build/skew-linux-roundtrip-v2/`，包含 results.json、control-results.json、各轮 serial.log 和完整 qmp.json。原有 `skew-check.py --quick` 回归结果位于 `build/skew-roundtrip-regression/`。第一次高频读取计数器的探索运行主动中止，未纳入此报告；正式负载在计数器读取间加入纯计算。
 
 本测试不等同于特定软件看门狗的完整验收，也未验证熵质量。进入 skew 后继续使用 jitter 仍可能失败；切换时机由外部控制器决定。两个模式的累计量用于虚拟时间组成，skew-ips 不代表与宿主墙钟同速。
+
+## visible 场景的实现和验收
+
+完整状态、字段与锁顺序见 [visible 双向切换](SKEW_VISIBLE_SWITCH_zh.md)。
+定向测试使用实际时钟/CPU 切换函数、QEMU atomics、seqlock 和 QemuEvent：
+
+```sh
+python3 tests/tcg/aarch64/system/skew-visible-switch.py --build-dir build
+```
+
+覆盖 visible 领先/落后 model、未结算插值、窗口饱和、旧阶段读者暂停后
+再发布、新读者等待提交，以及四个并发读者下的 1000 次双向切换。
+Linux 脚本追加 visible/model 偏差、斜率、暂停切换重锚检查；不依赖运行
+30 ms 后每核 raw 必须已经发布这一假设。

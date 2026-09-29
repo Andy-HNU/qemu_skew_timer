@@ -46,6 +46,21 @@ CAS-max 发布高水位；seqlock 保护锚点元组，不能单独保护读后�
 协调间隔，而不是命令行 ``skew-update`` 的名义间隔；BQL 竞争或宿主调度延迟
 不会因此制造错误的速率。
 
+插值与采样使用独立时间锚点：``visible_anchor_elapsed_ns`` 与
+``anchor_visible_ns`` 配对，允许 ``skew_cpu_prepare()`` 在提升斜率时重建；
+``sample_anchor_elapsed_ns`` 与 ``prev_global_icount`` 配对，只在协调采样
+和阶段初始化时一起更新。CPU 从 idle 恢复不会截短统计时间区间，也不会把
+此前积累的指令进度误算为恢复后短时间内完成。初始化时两个时间锚点使用
+同一次 ``cpu_get_clock()`` 采样。
+
+例如每 100 条指令对应 1 ms 模型时间，0～10 ms 累计 400 条指令，即使 CPU
+在 8 ms 恢复并重设插值锚点，下一次速度样本仍为 4/10=0.4，而不是使用
+10-8=2 ms 作为分母后被限幅到 1.0。
+
+定向回归通过可控 VM 时钟执行源码中的初始化、prepare 和协调更新函数::
+
+    python3 tests/tcg/aarch64/system/skew-momentum-anchor.py
+
 连续读取与边界
 --------------
 
@@ -111,3 +126,15 @@ skew 功能回归通过；运行态和暂停态下的 MTTCG→skew→MTTCG 往�
 长时间完全停止，可见时间最终会到达窗口上界并暂停；任何有限窗口都无法在模型
 永久停止时同时保证无限连续推进。本实现解决的是正常 TCG 执行和协调抖动下的
 阶梯时间问题，不伪造无界的 guest 执行进度。
+
+visible 场景的双向切换
+----------------------
+
+运行时仍使用 ``skew-start`` / ``skew-stop``。两个方向均以旧模式最终
+visible 为新阶段起点；退出时结算协调器尚未保存的插值贡献，进入时清空历史。
+model、visible、插值锚点、独立采样锚点按同一个冻结 elapsed 采样重建。
+全 vCPU 停核后才改预算/CF_USE_ICOUNT，保留 CF_PARALLEL；旧 TB 清空后，
+持有 BQL 完成旧 visible 结算和重锚，排除协调器和调试查询交错。
+旧阶段 vCPU 发布已在停核前结束；正常 getter 不登记读者，继续使用原有 CAS-max。
+
+状态与验证方法见 ``SKEW_VISIBLE_SWITCH_zh.md``。

@@ -34,6 +34,8 @@ ARM 计数器锁路径和竞争边界（第 7 节）。
 
 ## 设计与功能验收
 
+- [visible 场景的双向切换、读者屏障与验收](SKEW_VISIBLE_SWITCH_zh.md)
+
 - [CAS 发布改造与 WSL 验证（含一次 jitter 初始化失败记录）](SKEW_CAS_VALIDATION_20260929.md)
 
 - [持续 skew 的可见时间动量插值与 jitterentropy 实测](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)

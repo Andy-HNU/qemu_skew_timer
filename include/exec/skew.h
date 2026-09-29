@@ -22,7 +22,11 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
                Error **errp);
 /* 已配置但可尚未启用；用于安装时钟路由和观测接口。 */
 bool skew_configured(void);
-/* 统一虚拟纳秒时间：延迟启用期间取原生时钟，启用后取协调器发布值。 */
+/*
+ * 统一虚拟纳秒时间：MTTCG 累计时钟或 skew 插值/CAS-max 发布。
+ * 调用者为 vCPU 执行上下文或持有 BQL 的路径；切换先停稳全部 vCPU，
+ * 再持有 BQL 重锚。正常读取不登记、不等待切换专用同步对象。
+ */
 int64_t skew_get_clock(void);
 /* 向机器对象注册只读 skew-time 属性。 */
 void skew_register_clock(Object *obj);

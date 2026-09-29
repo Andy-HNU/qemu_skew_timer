@@ -11,10 +11,10 @@
 | 固定 Delta T | 更新器可能延迟，动量以实际 cpu_get_clock 间隔归一化 |
 | 纯历史趋势斜率 | 8 样本 beta=3/4，再反馈、截断；active 有 1/256 floor |
 | 反馈为 ratio*bias/Delta T | 实现先将 abs(bias)/Delta T 截到 1，再乘 0.01；不是无界线性反馈 |
-| elapsed anchor 等于统计 anchor | prepare 从 idle 恢复也可能重置同一个 anchor，审计动量采样时要计入此行为 |
+| 插值与统计 anchor 独立 | prepare 只重建 visible_anchor_elapsed_ns；sample_anchor_elapsed_ns 与 prev_global_icount 配对更新，采样分子和分母覆盖同一区间 |
 | 所有 inactive local >= G | 不成立；下界只针对已 rebase 的 active CPU；idle 历史映射可能落后 |
 | WFI/WFE 都移出集合 | 由 cpu_thread_is_idle/stop/runstate 判断；WFE 不能仅凭指令名推断 |
-| shared monotonic 的形式化证明 | 协调器与读者现统一 CAS-max；同阶段证明、停核切换边界及定向测试见 docs/clock-model/SKEW_CODE_WIKI_zh.md 第 7 节，有限 guest 测试不替代证明 |
+| shared monotonic 的形式化证明 | 协调器与读者现统一 CAS-max；同阶段 CAS 证明、跨阶段停核/BQL 同步及定向测试见 docs/clock-model/SKEW_CODE_WIKI_zh.md 第 7 节，有限 guest 测试不替代证明 |
 | clock 完全 host-independent | model 的指令换算不直接取 host elapsed，但活动集合/程序路径可变；visible 显式使用宿主间隔 |
 | hardware-calibrated | 暂无提供的硬件配对测量，作为方法与待验证假设 |
 | smooth clock | 分段线性、整数计数器量化；可饱和、可向前重锚，不能保证严格连续或每次递增 |

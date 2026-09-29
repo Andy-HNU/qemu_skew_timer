@@ -429,7 +429,7 @@ ARM System Counter 和设备的 QEMU_CLOCK_VIRTUAL 都走 `skew_get_clock()`；
 不能把设备 timer 描述为独立的 model-only 时钟域。
 
 读者按旧快照计算 `P = anchor_visible_ns + (cpu_get_clock() -
-last_update_elapsed_ns) * visible_slope_q32 / 2^32`，限幅到
+visible_anchor_elapsed_ns) * visible_slope_q32 / 2^32`，限幅到
 `[max(M - window_ns, 0), M + window_ns]`，再调用
 `skew_publish_visible(P)`。返回值可能大于 P，因为其他读者已经推进了高水位。
 anchor 是分段预测的起点，不必一直等于 visible。
@@ -526,7 +526,9 @@ seqlock 保护字段快照，不撤销读者 CAS 的副作用，也不阻止已�
 
 `use_skew` 使用原子访问，正常执行期间不改变；预算回调指针和 cflags
 只在初始化或全核停稳后改变。64 位共享时钟字段采用 aligned 类型和 QEMU 原子接口。
-getter 不取得 BQL，CAS helper 不取得任何锁，也不调用 getter。
+getter 不取得 BQL，也不为模式切换登记读者；正常路径保持原有 seqlock/CAS-max。
+调用上下文为 vCPU 执行或持有 BQL 的路径。切换先停稳全部 vCPU，再持有 BQL
+重锚；QMP/QOM 调试查询在 BQL 下复用 getter，无需改成只读。CAS helper 不取得任何锁，也不调用 getter。
 BQL 写者可以调用 getter，但禁止在 clock_seqlock 写区间内调用它，否则会自重试。
 VM clock 的内部读写同步保持原来的调用顺序，不在 skew 中反向获取 BQL。
 
@@ -536,7 +538,7 @@ VM clock 的内部读写同步保持原来的调用顺序，不在 skew 中反�
 |---|---|
 | 多个无 BQL 读者同时推进 visible | CAS-max；允许失败重试，不允许同阶段写小；当前 ARM 计数器路径先受 BQL 串行化 |
 | 协调器与读者推进 visible | 共用 CAS-max，消除读后覆盖；元组仍由 seqlock 发布 |
-| 协调器发布期间读锚点 | seqlock 校验失败重试；没有读锁计数，也没有读者阻止写者开始的机制 |
+| 协调器发布期间读锚点 | seqlock 校验失败重试；读者按 seqlock/CAS 处理同阶段竞争 |
 | prepare 修改活动斜率与协调器 | 两者持 BQL，写元组用 seqlock；读者可继续 CAS 推进 |
 | raw account 与协调采样 | 原子 raw，单核单写者；可能采到本轮前或本轮后，不读取运行中预算 |
 | idle/rejoin 与协调器扫描 | BQL 保护成员和基线；重入时 raw_base=raw、logical_base=G；窗口等待者仍 active |
@@ -544,20 +546,27 @@ VM clock 的内部读写同步保持原来的调用顺序，不在 skew 中反�
 | kick 与 TB 异常回退 | 保留旧预算模型直到 stopped；回退退还未执行指令，EXCP_ATOMIC 后统一 account |
 | QMP 查询与运行中 raw | BQL 保证结构和基线；raw 可继续增长，查询不是全核冻结快照 |
 | timer 与暂停/恢复 | VM 状态回调删除/重排 REALTIME coordinator；update 检查 mode/runstate；virtual deadline 不包含 coordinator |
-| 切换与旧执行 | 保留原 vm_stop -> account/stopped -> rebase/ops/cflags -> flush -> vm_start 顺序 |
+| 切换与旧执行 | timer_del -> vm_stop/account/stopped -> ops/cflags -> flush -> BQL 下 visible 结算/rebase -> vm_start |
 
 初始化和模式切换仍有直接赋值：它们建立新的阶段，不是协调器的普通发布。
-当前切换通过停核和 BQL 静止 vCPU/BQL 读者，按最终 visible 结算累计时间，
-进入时 model=visible=anchor=T，退出时 MTTCG 从相同 T 继续。
-**同阶段 CAS 证明不能直接用于跨阶段**：model 重锚可能变小。
-若增加无 BQL 的 IOThread 时钟读者，需另行证明旧阶段读者已经退出，
-或引入阶段读者同步；原有外层 seqlock 重试本身不能撤销旧 CAS。
-本次不宣称补齐任意外部读者的切换屏障，也不更改已有切换协议。
+当前切换先停稳全部 vCPU，使在途读取和 CAS 发布完成，再持有 BQL 排除协调器、
+QMP/QOM 和主循环设备路径，随后用一次冻结的 cpu_get_clock() 采样结算最终 visible=T。
+两个方向均重建 model=visible=anchor=T，退出时 MTTCG 从相同 T 继续，
+不把未发布指令尾部或旧 visible/model 偏差变成时间跳变。
+flush 及插件回调在重锚前完成；clock_switching 防止停核释放 BQL 期间重入，
+也阻止协调器重新安排。vm_stop 失败或期间 VM 状态改变时保持旧模式。
+正常 getter 不增加读者计数、等待事件或切换专用原子操作。该协议不承诺任意
+独立 IOThread 在 BQL 外持续调用并发布时也能安全重锚；新增调用者须遵守已有
+vCPU/BQL 生命周期约束，不能仅靠时钟元组 seqlock 撤销 CAS 副作用。
+详细协议与定向测试见 [visible 双向切换](SKEW_VISIBLE_SWITCH_zh.md)。
 
-另外两个已有边界不由本次 CAS 修复：
-- prepare 提升斜率时也重设 last_update_elapsed_ns，却不重设 prev_global_icount；
-  插值锚点与动量采样锚点复用，可能使采样分子/分母区间不完全一致。后续可拆分，
-  本次保留速率行为；这不是 visible 原子覆盖问题。
+后续采样修复将两个锚点拆分：prepare 提升斜率只重设
+visible_anchor_elapsed_ns；独立的 sample_anchor_elapsed_ns 与
+prev_global_icount 在协调采样或阶段初始化时配对更新，保证分子和分母
+覆盖同一统计区间。初始化时两个时间锚点来自同一次 cpu_get_clock() 采样。
+定向回归见 `tests/tcg/aarch64/system/skew-momentum-anchor.py`。
+
+仍保留以下已有边界：
 - 同阶段保证基于计数及有符号纳秒运算未溢出；本次不扩展超长运行溢出策略。
   下界校正、idle warp 仍可能向前跳，窗口饱和仍可能平台，CAS 不保证每次读取严格增加。
 

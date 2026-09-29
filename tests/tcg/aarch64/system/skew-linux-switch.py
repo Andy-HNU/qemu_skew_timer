@@ -187,6 +187,13 @@ def run_case(args, archive, out, paused):
                 def check_clock(state):
                     assert state['virtual-ns'] == (state['mttcg-elapsed-ns'] +
                                                   state['skew-elapsed-ns'])
+                    assert state['visible-bias-ns'] == (state['virtual-ns'] -
+                                                       state['model-ns'])
+                    assert abs(state['visible-bias-ns']) <= state['window-ns']
+                    assert 0 <= state['visible-slope-q32'] <= 1 << 32
+                    if state['mode'] == 'mttcg':
+                        assert state['model-ns'] == state['virtual-ns']
+                        assert state['visible-slope-q32'] == 0
 
                 def check_reset(state, enabled):
                     assert state['global-icount'] == 0
@@ -202,6 +209,10 @@ def run_case(args, archive, out, paused):
                     if paused:
                         qmp.call('stop')
                     before = qmp.call('query-skew-clock')
+                    if paused and before['mode'] == 'skew':
+                        # stop has settled each CPU's in-flight budget. A
+                        # running 30ms snapshot cannot make this assertion.
+                        assert all(cpu['raw-icount'] > 0 for cpu in before['cpus'])
                     switched = qmp.call(command)
                     check_clock(switched)
                     assert switched['mode'] == mode
@@ -210,6 +221,9 @@ def run_case(args, archive, out, paused):
                     assert switched['virtual-ns'] >= switched['start-ns']
                     if paused:
                         assert switched['virtual-ns'] == before['virtual-ns']
+                        assert switched['model-ns'] == switched['virtual-ns']
+                        assert switched['visible-bias-ns'] == 0
+                        assert switched['visible-slope-q32'] == 0
                         check_reset(switched, mode == 'skew')
                         assert not qmp.call('query-status')['running']
                         time.sleep(0.02)
@@ -231,7 +245,8 @@ def run_case(args, archive, out, paused):
                             assert state['mttcg-elapsed-ns'] == switched['mttcg-elapsed-ns']
                             for cpu in state['cpus']:
                                 assert cpu['budget-enabled']
-                                assert cpu['raw-icount'] > 0
+                                # raw excludes the current execution budget;
+                                # verify progress at the next paused switch boundary.
                                 if cpu['active']:
                                     lead = cpu['local-icount'] - state['global-icount']
                                     assert 0 <= lead <= state['window-insns']
