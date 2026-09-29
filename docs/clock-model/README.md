@@ -3,7 +3,8 @@
 ## 代码导读
 
 [Skew 代码 Wiki](SKEW_CODE_WIKI_zh.md)：TCG loop 流程图、budget/window、
-`skew.c` 和 icount 公共预算适配。
+`skew.c` 和 icount 公共预算适配，以及 visible CAS 发布、BQL/seqlock/原子字段、
+ARM 计数器锁路径和竞争边界（第 7 节）。
 
 ## 性能报告
 
@@ -32,6 +33,8 @@
 后续测试请使用新的输出目录和报告批次目录，保留本次原始记录。
 
 ## 设计与功能验收
+
+- [CAS 发布改造与 WSL 验证（含一次 jitter 初始化失败记录）](SKEW_CAS_VALIDATION_20260929.md)
 
 - [持续 skew 的可见时间动量插值与 jitterentropy 实测](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)
 - [MTTCG / skew 双向 QMP 切换：Linux /init 实测](SKEW_QMP_zh.md)

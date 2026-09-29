@@ -114,10 +114,31 @@ void skew_register_cpu(CPUState *cpu)
                         skew_read_raw, NULL, NULL, NULL);
 }
 
+/*
+ * Readers and the coordinator share this monotonic publication operation.
+ * A seqlock protects the clock tuple, but cannot undo a reader's CAS after
+ * validation.  Never overwrite a concurrent reader's high-water mark.
+ *
+ * Within one skew epoch model_ns never decreases and window_ns is fixed:
+ * a late prediction bounded by the old model + window also fits the new
+ * upper bound.  The coordinator supplies the new lower bound.  Epoch
+ * initialization/rebasing remains a separate, stopped-vCPU operation.
+ */
+static int64_t skew_publish_visible(int64_t candidate)
+{
+    int64_t old, next;
+
+    do {
+        old = qatomic_read_i64(&visible_ns);
+        next = MAX(old, candidate);
+    } while (next != old && qatomic_cmpxchg(&visible_ns, old, next) != old);
+    return next;
+}
+
 /* 全部 CPU 和设备共用同一时间线；切换前使用可随 VM 暂停的原生时钟。 */
 static int64_t skew_visible_clock(void)
 {
-    int64_t anchor, elapsed_anchor, model, predicted, lower, upper, old, next;
+    int64_t anchor, elapsed_anchor, model, predicted, lower, upper, next;
     uint64_t slope;
     unsigned seq;
 
@@ -135,11 +156,8 @@ static int64_t skew_visible_clock(void)
         predicted = MIN(MAX(predicted, lower), upper);
     } while (seqlock_read_retry(&clock_seqlock, seq));
 
-    /* 多个 CPU 共同推进一个原子可见时钟，只允许单调增加。 */
-    do {
-        old = qatomic_read_i64(&visible_ns);
-        next = MAX(old, predicted);
-    } while (next != old && qatomic_cmpxchg(&visible_ns, old, next) != old);
+    /* 多个 CPU 和协调器共同推进同一个可见时间高水位。 */
+    next = skew_publish_visible(predicted);
     return next;
 }
 
@@ -371,11 +389,11 @@ static void skew_update(void *opaque)
     }
     lower = MAX(now - (int64_t)window_ns, 0);
     upper = now + window_ns;
-    visible = MIN(MAX(MAX(visible, lower), qatomic_read_i64(&visible_ns)),
-                  upper);
+    visible = MIN(MAX(visible, lower), upper);
     seqlock_write_begin(&clock_seqlock);
     qatomic_set_i64(&model_ns, now);
-    qatomic_set_i64(&visible_ns, visible);
+    /* Keep a reader's later publication; anchor at the value we committed. */
+    visible = skew_publish_visible(visible);
     qatomic_set_i64(&anchor_visible_ns, visible);
     qatomic_set_i64(&last_update_elapsed_ns, elapsed_now);
     qatomic_set_u64(&visible_slope_q32, slope);

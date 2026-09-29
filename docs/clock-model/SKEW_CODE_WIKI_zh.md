@@ -366,7 +366,7 @@ account 使用发放时保存的 `skew_budget_global`，既避免无锁读取正
 
 1. 扫描各 CPU 的已发布 local。有 active 时，`global = MAX(old_global, MIN(active local))`。
 2. 没有 active 且所有 CPU 线程确实 idle 时，取 `completed = MAX(old_global, 所有 local)`，提交最后执行尾部。
-3. 发布 `virtual_ns = warp_ns + global × 10^9 / sim_ips`，用断言检查时间不倒退。
+3. 计算 `model_ns = start_ns + warp_ns + global × 10^9 / sim_ips`，结算旧插值并用 CAS-max 发布 visible，再重建锚点（详见第 7 节）。
 4. 全 idle 时查询最近 VIRTUAL deadline；若大于 0，累加 warp 并推进虚拟时间，再通知虚拟时钟处理路径。
 5. 唤醒窗口重新有余量的 CPU，重新安排 coordinator。
 
@@ -418,3 +418,157 @@ Skew 使用自己的 `skew_budget`、raw、基准和 global，不使用 `icount_
 3. [translator.c](../../accel/tcg/translator.c)：TB 入口的实际额度检查。
 4. [skew.c](../../accel/tcg/skew.c)：滑窗、时间推进、对齐与等待。
 5. [exec-budget.h](../../include/exec/exec-budget.h) 与 [icount 适配](../../accel/tcg/tcg-accel-ops-icount.c)：公共协议及两种模型的分工。
+
+## 7. visible 时间的 CAS 发布与并发协议
+
+### 7.1 model、visible 和锚点不是同一个量
+
+严格模型时间为 `M = start_ns + warp_ns + floor(global_icount * 1e9 / sim_ips)`。
+`model_ns` 由协调器发布；`visible_ns` 是 CPU 和设备已经可见的共享时间高水位。
+ARM System Counter 和设备的 QEMU_CLOCK_VIRTUAL 都走 `skew_get_clock()`；
+不能把设备 timer 描述为独立的 model-only 时钟域。
+
+读者按旧快照计算 `P = anchor_visible_ns + (cpu_get_clock() -
+last_update_elapsed_ns) * visible_slope_q32 / 2^32`，限幅到
+`[max(M - window_ns, 0), M + window_ns]`，再调用
+`skew_publish_visible(P)`。返回值可能大于 P，因为其他读者已经推进了高水位。
+anchor 是分段预测的起点，不必一直等于 visible。
+
+斜率不超过 1 只限制相对 cpu_get_clock 的速率，不保证 model 比 visible 快。
+慢核暂时不发布 raw 时，global 可停住而 visible 继续插值，直至窗口上界。
+活动状态的斜率下限为 1/256；model 与 visible 可以领先或落后一个窗口。
+
+### 7.2 通用 getter 为什么采用统一 CAS-max
+
+旧实现的协调器先读 visible、计算局部候选值，再用 atomic set 覆盖共享值。
+即使标量操作原子，也可能发生：
+
+1. 协调器准备发布 106，尚未进入 seqlock 写区间。
+2. vCPU 将共享 visible 推到 110，完成外层校验并返回。
+3. 协调器进入写区间后写回 106。
+
+上述交错针对未持 BQL 的 getter 调用者；并非当前 ARM CNTVCT 路径已复现的问题。
+共享字段降低是否被 guest 观察到，还取决于后续预测、计数器量化及线程时序。
+
+现在所有**同一 skew 阶段内**的 visible 推进共用以下操作：
+
+```c
+do {
+    old = qatomic_read_i64(&visible_ns);
+    next = MAX(old, candidate);
+} while (next != old && qatomic_cmpxchg(&visible_ns, old, next) != old);
+return next;
+```
+
+若 vCPU 已写入 110，协调器 CAS(100, 106) 失败，重试后保留 110。
+若无需增加，读取现值即可返回。每次调用都有原子读取或成功 CAS 对应的线性化点；
+并发调用不保证按返回完成顺序排序，但有先后依赖的读取不会因此倒退。
+不增加读写锁；vCPU 之间仍可能争用同一缓存行并重试 CAS，无单个调用等待上界保证。
+
+协调器的新发布顺序为：
+
+1. 在 BQL 下采样 raw、推进 global、计算新 model 和 idle warp。
+2. 结算旧插值，计算下一段动量/反馈斜率。
+3. 将局部 visible 候选值限幅到新 model 的窗口。
+4. 开始 seqlock 写区间，写 model，CAS-max 发布 visible。
+5. 用 CAS 返回值设置 anchor 和 skew elapsed，并发布 elapsed anchor、slope。
+6. 结束写区间，通知 virtual clock、唤醒窗口等待者并安排下一次协调。
+
+斜率根据发布前的样本计算；CAS 合并了稍晚的读者推进时，反馈留待后续周期纠正，
+不声称 bias、slope 与每一个并发读者在同一瞬间严格对应。
+
+当前 ARM 路径需要特别区分：`target/arm/helper.c` 将 CNTVCT_EL0、
+CNTPCT_EL0 及对应 AArch32 寄存器标成 ARM_CP_IO；
+`target/arm/tcg/op_helper.c` 的 get_cp_reg/get_cp_reg64 在 readfn 外持有 BQL。
+因此这条 guest 读取路径不会与持 BQL 的协调器发生上述交错。
+prepare、QMP 和主循环设备 timer 路径同样由 BQL 串行化。
+`skew_get_clock()` 自身不要求 BQL，QEMU_CLOCK_VIRTUAL 的通用调用者可能来自
+其他上下文。例如 x86 的 helper_rdtsc -> cpu_get_tsc -> cpus_get_elapsed_ticks
+没有在该 helper 中取得 BQL；本次只构建/验证了 AArch64，未对 x86 复现。
+CAS 统一的是该接口的发布协议；本次未声称无 BQL 生产调用者已经复现回退。定向测试显式创建无 BQL 的发布者。
+这也解释了为何此前高频 jitter 成功不能用于验证这种无 BQL 交错。
+
+### 7.3 旧锚点预测晚到为什么仍合法
+
+同一阶段满足：model 单调不减、window 固定、每个候选值先按其 model 限幅。
+因此旧预测值的上界满足：
+
+```text
+P_old <= M_old + W <= M_new + W
+```
+
+协调器候选值至少为新下界，CAS-max 不会降低它。
+例：旧 M=100、W=10；新 M=103，协调器发布 106，旧读者随后发布 108。
+108 仍在新窗口 [93,113] 中；后续预测为 107 时返回高水位 108。
+anchor=106 与 visible=108 可以共存，不需要回写 visible 或强制回归 model。
+
+seqlock 保护字段快照，不撤销读者 CAS 的副作用，也不阻止已通过校验的旧读者晚到。
+外层 `skew_get_clock()` 的重试保证返回路径重新检查模式和时钟元组。
+同阶段晚到写入由上述窗口不变量和 CAS-max 保证安全，不能只以“seqlock 会重试”解释。
+
+### 7.4 锁、原子字段与线程所有权清单
+
+以下覆盖 skew 直接使用及其调用路径依赖的同步；不把整个 QEMU 的设备锁列作 skew 私有锁。
+
+| 同步机制/所有权 | 保护对象和调用者 | 不能替代的保证 |
+|---|---|---|
+| BQL | 协调器、QMP 切换、VM 状态回调；global/start/warp、历史数组、CPU active/waiting/raw_base/logical_base、timer 启停 | vCPU 大部分执行在 BQL 外；不排除未持 BQL 的通用 getter 或 raw 发布 |
+| ARM_CP_IO 寄存器 helper 的 BQL | CNTVCT/CNTPCT 的 get_cp_reg/get_cp_reg64 在调用 readfn 前取得 BQL | 当前 ARM guest 计数器读取彼此及与协调器串行，不能把高频 CNTVCT 测试当作无 BQL 并发发布覆盖 |
+| clock_seqlock | BQL 串行化写者；读者取得 mode、累计量、model、anchor、elapsed anchor、slope 的一致快照 | QemuSeqLock 本身不提供写者互斥，不保护 visible CAS 的副作用 |
+| visible_ns CAS-max | vCPU、设备读者及协调器合并同阶段高水位 | 不原子更新整组字段，不解决阶段切换本身 |
+| skew_raw_icount 原子读写 | 每核 account 是正常运行时唯一写者；协调器/QOM/QMP 读取 | 所有 CPU 的 raw 不是同一时刻快照；原子 raw 不保护基线 |
+| vCPU 线程所有权 | skew_budget、skew_budget_global、递减器 low；prepare 发放、执行/回退消耗、account 结算 | 不能从控制线程读取运行中的 remaining 来代结算 |
+| halt_cond + BQL | skew_cpu_wait 释放 BQL 睡眠，醒后重新检查窗口、stop、halt、work、exit 条件 | signal 不等于获得预算；虚假唤醒不能跳过 while |
+| exit_request / icount_decr.high 原子通知 | cpu_exit/kick 用 release 发布退出；执行循环读取/清理；interrupt_request 使用通用原子操作 | 高 16 位不是预算，不得随清 low 一并清除 |
+| 全 vCPU 停止屏障 | vm_stop/pause_all_vcpus，停核等待释放 BQL；完成旧 account 后才改 ops/cflags/基线、flush TB | 仅持 BQL 或仅发送 kick 不足以修改执行中状态 |
+| VM clock seqlock + vm_clock_lock | cpu_get_clock 与 cpu_enable/disable_ticks；锁由 system/cpu-timers.c 管理 | REALTIME 不随 VM 暂停，不能替代插值用的可暂停 elapsed |
+| replay mutex / TCG exclusive / RCU | pause_all_vcpus 调整 replay 锁顺序；EXCP_ATOMIC 使用通用独占执行；CPU 线程注册 RCU | 不作为 visible 发布锁，不需要为 CAS 新增这些锁 |
+
+`use_skew` 使用原子访问，正常执行期间不改变；预算回调指针和 cflags
+只在初始化或全核停稳后改变。64 位共享时钟字段采用 aligned 类型和 QEMU 原子接口。
+getter 不取得 BQL，CAS helper 不取得任何锁，也不调用 getter。
+BQL 写者可以调用 getter，但禁止在 clock_seqlock 写区间内调用它，否则会自重试。
+VM clock 的内部读写同步保持原来的调用顺序，不在 skew 中反向获取 BQL。
+
+### 7.5 竞争场景与处理边界
+
+| 竞争场景 | 当前处理 |
+|---|---|
+| 多个无 BQL 读者同时推进 visible | CAS-max；允许失败重试，不允许同阶段写小；当前 ARM 计数器路径先受 BQL 串行化 |
+| 协调器与读者推进 visible | 共用 CAS-max，消除读后覆盖；元组仍由 seqlock 发布 |
+| 协调器发布期间读锚点 | seqlock 校验失败重试；没有读锁计数，也没有读者阻止写者开始的机制 |
+| prepare 修改活动斜率与协调器 | 两者持 BQL，写元组用 seqlock；读者可继续 CAS 推进 |
+| raw account 与协调采样 | 原子 raw，单核单写者；可能采到本轮前或本轮后，不读取运行中预算 |
+| idle/rejoin 与协调器扫描 | BQL 保护成员和基线；重入时 raw_base=raw、logical_base=G；窗口等待者仍 active |
+| account 与 reset | before_reset 先 account 并清预算，外层重复 account 的 executed 为零；不能提前清剩余预算 |
+| kick 与 TB 异常回退 | 保留旧预算模型直到 stopped；回退退还未执行指令，EXCP_ATOMIC 后统一 account |
+| QMP 查询与运行中 raw | BQL 保证结构和基线；raw 可继续增长，查询不是全核冻结快照 |
+| timer 与暂停/恢复 | VM 状态回调删除/重排 REALTIME coordinator；update 检查 mode/runstate；virtual deadline 不包含 coordinator |
+| 切换与旧执行 | 保留原 vm_stop -> account/stopped -> rebase/ops/cflags -> flush -> vm_start 顺序 |
+
+初始化和模式切换仍有直接赋值：它们建立新的阶段，不是协调器的普通发布。
+当前切换通过停核和 BQL 静止 vCPU/BQL 读者，按最终 visible 结算累计时间，
+进入时 model=visible=anchor=T，退出时 MTTCG 从相同 T 继续。
+**同阶段 CAS 证明不能直接用于跨阶段**：model 重锚可能变小。
+若增加无 BQL 的 IOThread 时钟读者，需另行证明旧阶段读者已经退出，
+或引入阶段读者同步；原有外层 seqlock 重试本身不能撤销旧 CAS。
+本次不宣称补齐任意外部读者的切换屏障，也不更改已有切换协议。
+
+另外两个已有边界不由本次 CAS 修复：
+- prepare 提升斜率时也重设 last_update_elapsed_ns，却不重设 prev_global_icount；
+  插值锚点与动量采样锚点复用，可能使采样分子/分母区间不完全一致。后续可拆分，
+  本次保留速率行为；这不是 visible 原子覆盖问题。
+- 同阶段保证基于计数及有符号纳秒运算未溢出；本次不扩展超长运行溢出策略。
+  下界校正、idle warp 仍可能向前跳，窗口饱和仍可能平台，CAS 不保证每次读取严格增加。
+
+### 7.6 验证入口与证据范围
+
+`tests/tcg/aarch64/system/skew-visible-cas.py` 提取实际 CAS helper，
+直接使用 QEMU atomic.h，并在 CAS 外插入 pthread barrier 强制定向交错：
+协调器读到 100 后停在 CAS 前，读者发布 110，再恢复协调器并验证失败重试。
+另测旧预测晚到、新下界和 8 个发布线程的 800,000 次调用，启用 UBSan。
+这验证真实 helper 的发布算法，不替代 QEMU seqlock、停核或 guest 集成测试。
+
+已有套件继续验证 Linux 持续 skew 启动/jitter init-use、运行态及暂停态往返、
+预算精确计数/异常/idle/IRQ，以及插桩 System Counter 的跨核顺序、边界与换算。
+插桩会改变调度，测试通过不能作为无插桩性能结论。

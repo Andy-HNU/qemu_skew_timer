@@ -22,7 +22,11 @@ Linux ``jitterentropy_rng`` 会把这种长时间不变视为计时源失效。
   CPU 和设备通过 ``skew_get_clock()`` 读取的共享时间。它在两个协调点之间按
   预测斜率推进，并始终受 ``model_ns ± skew`` 限制。
 
-所有 vCPU 访问同一个原子 ``visible_ns``。更新只允许取更大的值，因此跨 CPU
+所有 vCPU 访问同一个原子 ``visible_ns``。读者和协调器在同阶段统一使用
+CAS-max 发布高水位；seqlock 保护锚点元组，不能单独保护读后覆盖。
+当前 ARM 计数器 helper 还持有 BQL，通用 getter 本身不要求 BQL。
+详细同步边界见 `Skew 代码 Wiki <SKEW_CODE_WIKI_zh.md>`_ 第 7 节。
+更新只允许取更大的值，因此跨 CPU
 读取不会因切换执行线程而倒退，也没有每 CPU 私有时间。
 
 协调周期
