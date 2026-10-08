@@ -1,5 +1,8 @@
 /GNUmakefile
 /build/
+/docs/clock-model/benchmarks/
+/docs/clock-model/*-results.json
+/docs/clock-model/SKEW_*_VALIDATION_*.json
 /.cache/
 /.vscode/
 *.pyc

@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 """Standalone skew acceptance: stdlib + AArch64 GCC, no guest OS required."""
 import argparse
+from contextlib import closing, ExitStack
 import json
 import os
 from pathlib import Path
 import re
 import shlex
-import socket
 import subprocess
 import tempfile
 import time
 
+from skew_test_io import QemuPipe
 
-# QMP 控制与 QOM 读取：通过 Unix socket 驱动暂停、恢复和只读计数观测。
+# QMP 控制与 QOM 读取：通过 QEMU 原生 pipe 驱动暂停、恢复和只读计数观测。
 class QMP:
-    def __init__(self, path):
-        self.sock = socket.socket(socket.AF_UNIX)
-        self.sock.settimeout(30)
-        self.sock.connect(str(path))
-        self.file = self.sock.makefile("rwb", buffering=0)
+    def __init__(self, stream):
+        self.file = stream
         self.file.readline()
         self.cmd("qmp_capabilities")
 
@@ -38,45 +36,30 @@ class QMP:
     def get(self, path, prop):
         return self.cmd("qom-get", path=path, property=prop)
 
-    def close(self):
-        self.file.close()
-        self.sock.close()
-
-
 # 最小 GDB remote 客户端，用断点把计数读取固定到 guest 的指令边界。
 class GDB:
-    def __init__(self, path):
-        self.sock = socket.socket(socket.AF_UNIX)
-        self.sock.settimeout(60)
-        self.sock.connect(str(path))
+    def __init__(self, stream):
+        self.stream = stream
 
     # 按远程协议封装报文与校验和，读取应答并发送确认。
     def cmd(self, command):
         body = command.encode()
-        self.sock.sendall(b"$" + body + b"#" + f"{sum(body) % 256:02x}".encode())
-        while self.sock.recv(1) != b"$":
+        self.stream.write(b"$" + body + b"#" + f"{sum(body) % 256:02x}".encode())
+        while self.stream.read(1) != b"$":
             pass
         data = b""
-        while (ch := self.sock.recv(1)) != b"#":
+        while (ch := self.stream.read(1)) != b"#":
             if not ch:
                 raise EOFError("GDB disconnected")
             data += ch
-        self.sock.recv(2)
-        self.sock.sendall(b"+")
+        self.stream.read(1)
+        self.stream.read(1)
+        self.stream.write(b"+")
         return data.decode()
 
     # 插入/移除 AArch64 软件断点，配合起止符号精确测量完成指令数。
     def bp(self, addr, insert=True):
         assert self.cmd(f"{'Z' if insert else 'z'}0,{addr:x},4") == "OK"
-
-
-# 等待 QEMU 创建控制 socket；启动失败或超时立即使测试失败。
-def wait_socket(path, proc):
-    end = time.monotonic() + 15
-    while not path.exists():
-        assert proc.poll() is None, "QEMU exited before opening socket"
-        assert time.monotonic() < end, "socket startup timeout"
-        time.sleep(0.01)
 
 
 # 按 MODE 编译独立裸机 ELF；SKEW 控制是否强制验证 skew 特有超时结果。
@@ -216,7 +199,7 @@ def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
         cols = row.split()
         if len(cols) == 3:
             symbols[cols[2]] = int(cols[0], 16)
-    with tempfile.TemporaryDirectory(prefix="skew-") as temp:
+    with tempfile.TemporaryDirectory(prefix="skew-") as temp, ExitStack() as pipes:
         temp = Path(temp)
         qp, gp = temp / "qmp", temp / "gdb"
         cmd = command(qemu, elf, smp=1)
@@ -227,14 +210,13 @@ def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
             # 精确计数同时验证这种配置仍能跨 TB 边界正常执行。
             cmd = command(qemu, elf, smp=1, ips=100000000,
                           window=100, update=1)
-        cmd += ["-S", "-qmp", f"unix:{qp},server=on,wait=off",
-                "-gdb", f"unix:{gp},server=on,wait=off"]
+        qstream = pipes.enter_context(closing(QemuPipe(qp)))
+        gstream = pipes.enter_context(closing(QemuPipe(gp, timeout=60)))
+        cmd += ["-S", "-qmp", f"pipe:{qp}", "-gdb", f"pipe:{gp}"]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        qmp = gdb = None
+        qstream.process = gstream.process = proc
         try:
-            wait_socket(qp, proc)
-            wait_socket(gp, proc)
-            qmp, gdb = QMP(qp), GDB(gp)
+            qmp, gdb = QMP(qstream), GDB(gstream)
             cpu = qmp.cmd("query-cpus-fast")[0]["qom-path"]
             results = []
             # 预期包括起始 ISB/MRS 两条；结束标签处断点尚未执行该标签后的指令。
@@ -274,30 +256,24 @@ def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
             if proc.poll() is None:
                 proc.kill()
                 proc.communicate()
-            if qmp:
-                qmp.close()
-            if gdb:
-                gdb.sock.close()
 
 
 # 验证两个独立 vCPU 线程、暂停冻结、迁移拒绝及 UART 外部唤醒。
 def controls(qemu, out, idle=False):
     elf = build_guest(out, 10 if idle else 8)
-    with tempfile.TemporaryDirectory(prefix="skew-") as temp:
+    with tempfile.TemporaryDirectory(prefix="skew-") as temp, ExitStack() as pipes:
         temp = Path(temp)
         qp, serial_path = temp / "qmp", temp / "serial"
         cmd = command(qemu, elf)
         index = cmd.index("-serial")
-        cmd[index + 1] = f"unix:{serial_path},server=on,wait=off"
-        cmd += ["-S", "-qmp", f"unix:{qp},server=on,wait=off"]
+        qstream = pipes.enter_context(closing(QemuPipe(qp)))
+        serial = pipes.enter_context(closing(QemuPipe(serial_path)))
+        cmd[index + 1] = f"pipe:{serial_path}"
+        cmd += ["-S", "-qmp", f"pipe:{qp}"]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        qmp = serial = None
+        qstream.process = serial.process = proc
         try:
-            wait_socket(qp, proc)
-            wait_socket(serial_path, proc)
-            qmp = QMP(qp)
-            serial = socket.socket(socket.AF_UNIX)
-            serial.connect(str(serial_path))
+            qmp = QMP(qstream)
             cpus = qmp.cmd("query-cpus-fast")
             tids = [cpu["thread-id"] for cpu in cpus]
             assert len(tids) == len(set(tids)) == 2
@@ -315,7 +291,7 @@ def controls(qemu, out, idle=False):
                 assert qmp.get("/machine", "skew-time") == clock
                 assert [qmp.get(c["qom-path"], "skew-raw-icount")
                         for c in cpus] == raw
-                serial.sendall(b"x")
+                serial.write(b"x")
                 stdout, stderr = proc.communicate(timeout=30)
                 output = (stdout + stderr).decode()
                 (out / "idle-wake.log").write_text(output)
@@ -350,7 +326,7 @@ def controls(qemu, out, idle=False):
             error = qmp.cmd("migrate", uri=f"file:{temp / 'migration'}",
                             _allow_error=True)
             assert "skew" in error.get("error", {}).get("desc", ""), error
-            serial.sendall(b"x")
+            serial.write(b"x")
             stdout, stderr = proc.communicate(timeout=30)
             output = (stdout + stderr).decode()
             (out / "controls.log").write_text(output)
@@ -364,10 +340,6 @@ def controls(qemu, out, idle=False):
             if proc.poll() is None:
                 proc.kill()
                 proc.communicate()
-            if qmp:
-                qmp.close()
-            if serial:
-                serial.close()
 
 
 # 负面配置必须明确拒绝，不能悄悄退回其他时钟模式。

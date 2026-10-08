@@ -1,7 +1,13 @@
 > 来源说明：本文同步自 v10.2.0 skew 源分支，描述原方案设计、接口或验收要求。
 > v7 的布局/函数适配及本次实际通过结果见 [v7.2.0 移植验收](BACKPORT_V7_2_VALIDATION_zh.md)；本文历史实测数字不作为 v7 验收证据。
 
-按正文中的**单 QEMU、多 vCPU**方案设计测试，以双核收发包为主场景，`-smp 1` 用于验证基础计数与时钟换算。以下内容是测试方案，尚未进行代码验证。
+以下是**单 QEMU、多 vCPU**的测试设计范围，不能作为当前 checkout 的通过报告。实际入口与 v7 覆盖范围见 [README](README.md) 和 [移植验收记录](BACKPORT_V7_2_VALIDATION_zh.md)。双核收发包为设计主场景，`-smp 1` 用于验证基础计数与时钟换算。
+
+当前 `skew-check.py`、`skew-linux-switch.py` 和 `skew-linux-jitter.py`
+使用 QEMU 原生 `pipe:` 字符设备，通过 `TMPDIR` 下的 POSIX FIFO 传送
+QMP、GDB 和串口协议，不需要 Unix/TCP socket。运行前将 `TMPDIR` 指向
+仓库下的可写目录。传输读写有超时，QEMU 提前退出也会报错；原验收断言不变。
+共享传输自检：`python3 tests/tcg/aarch64/system/skew_test_io.py`。
 
 测试需要分别验证：**指令计数正确、全局时间正确、线程持续推进、业务超时行为正确**。仅观察“软件不再超时”，无法判断是否存在时间停滞或 Timer 失效。
 

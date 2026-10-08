@@ -103,8 +103,10 @@ python3 tests/tcg/aarch64/system/skew-linux-jitter.py build/qemu-system-aarch64 
 - [插值和采样锚点](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)
 - [性能扫描工具](SKEW_SWEEP_zh.md)
 
-其余来自 v10.2.0 的历史验收/性能记录只用于追溯原方案，不能作为
-v7.2.0 的测试结果。此分支的实测以移植验收报告和本次输出为准。
+来自 v10.2.0 的历史实现报告、阶段验收摘要和结果 JSON 不再随此分支维护，
+可在[整理前提交](https://github.com/Andy-HNU/qemu_skew_timer/tree/99c111c3fbb01bd769b39d8bc257c5ec7b345955/docs/clock-model)
+追溯。这些记录不能作为 v7.2.0 的测试结果。本分支保留移植说明与验收记录；
+每次新运行结果放在新的 `build/` 子目录，不能用历史通过记录替代当前测试。
 迁移、快照、record/replay、skew 与原生 icount 同时启用仍不受支持。
 
 上游回归入口（plugins 构建与 guest 运行分两步，兼容 v7 的 Makefile）：
