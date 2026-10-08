@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compile the actual skew helper and compare it with Python integer arithmetic."""
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -22,7 +23,7 @@ code += 'return 0; }\n'
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     (path / 'test.c').write_text(code)
-    subprocess.run(['gcc-10', '-Wall', '-Werror', '-fsanitize=undefined',
+    subprocess.run([os.environ.get('CC', 'cc'), '-Wall', '-Werror', '-fsanitize=undefined',
                     str(path / 'test.c'), '-o', str(path / 'test')], check=True)
     actual = list(map(int, subprocess.check_output([str(path / 'test')], text=True).split()))
 expected = [min(a*b//c, 2**64-1) for a, b, c in cases]

@@ -6,35 +6,20 @@ Requires a matching kernel and jitterentropy_rng.ko with built-in dependencies,
 an AArch64 static libc toolchain, and cpio. See SKEW_QMP_zh.md for an example.
 """
 import argparse
+from contextlib import closing
 import json
 import pathlib
 import shutil
-import socket
 import subprocess
 import tempfile
 import time
 
-
-def connect(path, proc):
-    end = time.monotonic() + 20
-    while time.monotonic() < end:
-        sock = socket.socket(socket.AF_UNIX)
-        try:
-            sock.connect(str(path))
-            sock.settimeout(120)
-            return sock
-        except (FileNotFoundError, ConnectionRefusedError):
-            sock.close()
-            if proc.poll() is not None:
-                raise RuntimeError('QEMU exited before socket connection')
-            time.sleep(0.02)
-    raise TimeoutError(str(path))
+from skew_test_io import QemuPipe
 
 
 class QMP:
-    def __init__(self, sock):
-        self.sock = sock
-        self.stream = sock.makefile('rb')
+    def __init__(self, stream):
+        self.stream = stream
         self.records = [json.loads(self.stream.readline())]
         self.call('qmp_capabilities')
 
@@ -43,7 +28,7 @@ class QMP:
         if arguments is not None:
             request['arguments'] = arguments
         self.records.append(request)
-        self.sock.sendall(json.dumps(request).encode() + b'\n')
+        self.stream.write(json.dumps(request).encode() + b'\n')
         while True:
             line = self.stream.readline()
             if not line:
@@ -87,12 +72,13 @@ def control_checks(args):
             cmd = [str(args.qemu), '-M', 'virt', '-cpu', 'cortex-a57',
                    '-smp', '2', '-display', 'none', '-serial', 'none',
                    '-monitor', 'none', '-S', '-accel', accel,
-                   '-qmp', f'unix:{path},server=on,wait=off']
-            with (args.output / f'control-{configured}.log').open('w') as log:
+                   '-qmp', f'pipe:{path}']
+            with (args.output / f'control-{configured}.log').open('w') as log, \
+                 closing(QemuPipe(path, timeout=120)) as stream:
                 proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
+                stream.process = proc
                 try:
-                    sock = connect(path, proc)
-                    qmp = QMP(sock)
+                    qmp = QMP(stream)
                     if configured:
                         before = qmp.call('query-skew-clock')
                         after = qmp.call('skew-start')
@@ -115,8 +101,6 @@ def control_checks(args):
                     assert proc.returncode == 0
                     results.append({'configured': configured, 'passed': True,
                                     'qmp': qmp.records})
-                    qmp.stream.close()
-                    sock.close()
                 finally:
                     if proc.poll() is None:
                         proc.kill()
@@ -138,29 +122,30 @@ def run_case(args, archive, out, paused):
         cmd = [str(args.qemu), '-M', 'virt,gic-version=3', '-cpu', 'cortex-a57',
                '-smp', '2', '-m', '512M', '-display', 'none', '-monitor', 'none',
                '-nic', 'none', '-no-reboot', '-S',
-               '-serial', f'unix:{spath},server=on,wait=off',
-               '-qmp', f'unix:{qpath},server=on,wait=off',
+               '-serial', f'pipe:{spath}',
+               '-qmp', f'pipe:{qpath}',
                '-accel', 'tcg,thread=multi,skew=1000000,skew-ips=2000000000,'
                          'skew-update=100000,skew-defer=on',
                '-kernel', str(args.kernel), '-initrd', str(archive),
                '-append', 'console=ttyAMA0 earlycon rdinit=/init nokaslr loglevel=7']
         (out / 'command.json').write_text(json.dumps(cmd, indent=2))
         with (out / 'qemu.log').open('w') as err, \
-             (out / 'serial.log').open('wb') as log:
+             (out / 'serial.log').open('wb') as log, \
+             closing(QemuPipe(qpath, timeout=120)) as qstream, \
+             closing(QemuPipe(spath, timeout=120)) as serial:
             proc = subprocess.Popen(cmd, stdout=err, stderr=subprocess.STDOUT)
+            qstream.process = serial.process = proc
             qmp = None
             serial_text = bytearray()
             try:
-                qsock = connect(qpath, proc)
-                serial = connect(spath, proc)
-                qmp = QMP(qsock)
+                qmp = QMP(qstream)
 
                 def wait_for(marker):
                     end = time.monotonic() + 120
                     while marker.encode() not in serial_text:
                         if time.monotonic() > end:
                             raise TimeoutError(marker)
-                        chunk = serial.recv(65536)
+                        chunk = serial.read(65536)
                         if not chunk:
                             raise RuntimeError('serial disconnected: ' + marker)
                         serial_text.extend(chunk)
@@ -234,7 +219,7 @@ def run_case(args, archive, out, paused):
                         assert qmp.call('query-status')['running']
                         if mode == 'mttcg':
                             check_reset(switched, False)
-                    serial.sendall(b'GO\n')
+                    serial.write(b'GO\n')
                     snapshots = []
                     for _ in range(2):
                         time.sleep(0.03)
@@ -266,7 +251,7 @@ def run_case(args, archive, out, paused):
                 time.sleep(0.05)
                 assert qmp.call('query-skew-clock') == stopped, 'paused clock advanced'
                 qmp.call('cont')
-                serial.sendall(b'DONE\n')
+                serial.write(b'DONE\n')
                 wait_for('SWITCH_TEST_PASS')
                 proc.wait(timeout=30)
                 assert proc.returncode == 0
@@ -274,9 +259,6 @@ def run_case(args, archive, out, paused):
                               stopped=stopped, passed=True)
                 (out / 'results.json').write_text(json.dumps(result, indent=2))
                 print(f'{out.name}: round trips PASS', flush=True)
-                serial.close()
-                qmp.stream.close()
-                qsock.close()
                 return result
             finally:
                 if qmp:

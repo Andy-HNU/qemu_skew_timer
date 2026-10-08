@@ -84,7 +84,7 @@ python3 tests/tcg/aarch64/system/skew-visible-switch.py --build-dir build
 python3 tests/tcg/aarch64/system/skew-momentum-anchor.py
 python3 tests/tcg/aarch64/system/skew-visible-cas.py
 python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
-    --quick --output build/skew-no-registration-20260929/quick
+    --quick --output build/skew-visible-quick
 ```
 
 visible-switch 定向测试提取实际 clock/CPU 函数，使用 QEMU 原子和 seqlock。
@@ -97,22 +97,5 @@ visible-switch 定向测试提取实际 clock/CPU 函数，使用 QEMU 原子和
 本轮移除 `clock_readers`、open/drained 事件、四个登记/关闭辅助函数及所有调用。
 保留采样锚点修复和模式切换字段结算，未改变正常阶段的 CAS-max 发布算法。
 
-## 2026-09-29 移除登记后的验证
-
-本轮重新构建 AArch64，结果保存在 `build/skew-no-registration-20260929/`。
-
-| 检查 | 结果 |
-|---|---|
-| AArch64 构建 | 通过，见 build.log |
-| visible 定向测试 | 正负 bias、插值、边界、CPU flags/high，以及四个发布者在每次切换前停稳的 1000 次转换通过，UBSan |
-| 采样锚点回归 | 通过，旧共享采样锚点的测试变体按预期被拒绝 |
-| 同阶段 CAS | 通过，强制重试和 8 线程 / 800000 次发布 |
-| quick guest | 11 场景通过，包含 TB 精确计数、控制、窗口、定时器和多核并行检查 |
-| Linux 双向切换 | 运行中/暂停两轮共 8 次转换通过；可见时间连续、暂停冻结、累计量、重锚、跨核 Counter、休眠和 timerfd 检查通过 |
-| Linux jitter | 初始化及 256 次 AF_ALG 读取通过，57 次 QMP 采样 |
-| 热路径核对 | getter、clock_at、visible_clock、publish_visible 四个函数与上次性能测试的无登记 A 基线逐字一致 |
-| 二进制核对 | 登记计数/事件/辅助函数符号全部消失；getter 仅调用 cpu_get_clock 后转入 clock_at |
-
-本轮没有新增每次读取的模式切换检查、BQL 获取或共享原子登记。
-以上证明移除了新增同步操作，不把机器运行噪声包装成精确的“耗时零差异”；
-未重跑整套性能矩阵。原有 QMP/QOM 的插值/CAS-max 读取语义保留。
+历史验收和性能记录见[整理前文档](https://github.com/Andy-HNU/qemu_skew_timer/blob/17d49d3d497ce9f2235c739acfedcca7e0a0e086/docs/clock-model/SKEW_VISIBLE_SWITCH_zh.md)。
+当前运行应使用新输出目录，并分别执行定向测试和真实 guest 集成测试。

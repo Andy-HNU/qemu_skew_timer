@@ -2,3 +2,7 @@
 __pycache__/
 build/
 figures/results/
+figures/design/
+figures/examples/
+experiments/*/example.csv
+experiments/*/results/

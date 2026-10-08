@@ -116,8 +116,10 @@ Linux jitterentropy 验证
 * 通过 AF_ALG ``jitterentropy_rng`` 完成 256 次、每次 64 字节的实际读取；
 * 周期查询 QMP，检查共享可见时间单调、斜率不超过 1、偏差不超过 window。
 
-本机连续 5 次探索复跑及最终构建复跑均通过 jitter 初始化和 256 次读取。原有
-skew 功能回归通过；运行态和暂停态下的 MTTCG→skew→MTTCG 往返测试也通过。
+历史本机复跑记录见
+`整理前文档 <https://github.com/Andy-HNU/qemu_skew_timer/blob/17d49d3d497ce9f2235c739acfedcca7e0a0e086/docs/clock-model/SKEW_VISIBLE_TIME_MOMENTUM_zh.rst>`_。
+当前运行使用 ``README.md`` 和 ``TEST_ACCEPTANCE_zh.md`` 的命令，
+分别报告持续 jitter 与双向切换结果，不用历史数字替代当前验收。
 
 边界说明
 --------

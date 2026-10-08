@@ -75,15 +75,22 @@ def main():
     p.add_argument("--out",type=Path,required=True)
     p.add_argument("--repeats",type=int,default=7)
     p.add_argument("--cases",nargs="+",choices=list(CASES),default=list(CASES))
-    a=p.parse_args();out=a.out.resolve();out.mkdir(parents=True,exist_ok=True)
+    a=p.parse_args();out=a.out.resolve()
+    if out.exists() and any(out.iterdir()):
+        p.error("--out must be a new or empty directory; do not reuse old traces")
+    out.mkdir(parents=True,exist_ok=True)
     baseline=ROOT/"build/qemu-system-aarch64"
     probe=ROOT/"build/exp5-probe/qemu-system-aarch64"
     source=ROOT/"tests/tcg/aarch64/system"
+    # Restricted containers may not expose sysfs CPU topology. Preserve the
+    # failure as metadata; it must not become invented host measurements.
+    host_cpu=subprocess.run(["lscpu"],text=True,capture_output=True)
     manifest=dict(evidence="measured",started_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),
         baseline_commit=subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),
         binaries={str(x):digest(x) for x in (baseline,probe)},guest_source_sha256=digest(HERE/"counter-guest.c"),
         uname=subprocess.check_output(["uname","-a"],text=True).strip(),
-        lscpu=subprocess.check_output(["lscpu"],text=True),
+        lscpu=host_cpu.stdout,lscpu_returncode=host_cpu.returncode,
+        lscpu_stderr=host_cpu.stderr,
         repetitions=a.repeats,warmups=1,seed=20260920,cases={k:CASES[k] for k in a.cases},
         instrumentation="BQL-ordered records in memory; buffered until exit; tracing overhead is not performance evidence",
         counter_frequency_hz=62500000)
@@ -145,6 +152,9 @@ def main():
                  "counter_conversion_violations","model_formula_violations"))
             with trace.open("rb") as f,gzip.open(str(trace)+".gz","wb") as z:shutil.copyfileobj(f,z)
             if rep!=0:trace.unlink()
+        elif kind=="probe":
+            item["passed"]=False
+            item["error"]="missing probe trace"
         results.append(item)
         (out/"runs.json").write_text(json.dumps(results,indent=2))
         print(label,"PASS" if item["passed"] else "FAIL",f"{duration:.3f}s",

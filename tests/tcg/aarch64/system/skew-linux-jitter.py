@@ -2,35 +2,20 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Test jitterentropy initialization and use while skew stays enabled."""
 import argparse
+from contextlib import closing
 import json
 import pathlib
 import shutil
-import socket
 import subprocess
 import tempfile
 import time
 
-
-def connect(path, proc):
-    end = time.monotonic() + 20
-    while time.monotonic() < end:
-        sock = socket.socket(socket.AF_UNIX)
-        try:
-            sock.connect(str(path))
-            sock.settimeout(200)
-            return sock
-        except (FileNotFoundError, ConnectionRefusedError):
-            sock.close()
-            if proc.poll() is not None:
-                raise RuntimeError('QEMU exited before socket connection')
-            time.sleep(0.02)
-    raise TimeoutError(str(path))
+from skew_test_io import QemuPipe
 
 
 class QMP:
-    def __init__(self, sock):
-        self.sock = sock
-        self.stream = sock.makefile('rb')
+    def __init__(self, stream):
+        self.stream = stream
         self.records = [json.loads(self.stream.readline())]
         self.call('qmp_capabilities')
 
@@ -39,7 +24,7 @@ class QMP:
         if arguments is not None:
             request['arguments'] = arguments
         self.records.append(request)
-        self.sock.sendall(json.dumps(request).encode() + b'\n')
+        self.stream.write(json.dumps(request).encode() + b'\n')
         while True:
             result = json.loads(self.stream.readline())
             self.records.append(result)
@@ -92,25 +77,27 @@ def main():
         cmd = [str(args.qemu), '-M', 'virt,gic-version=3', '-cpu', 'cortex-a57',
                '-smp', '2', '-m', '512M', '-display', 'none', '-monitor', 'none',
                '-nic', 'none', '-no-reboot',
-               '-serial', f'unix:{spath},server=on,wait=off',
-               '-qmp', f'unix:{qpath},server=on,wait=off',
+               '-serial', f'pipe:{spath}',
+               '-qmp', f'pipe:{qpath}',
                '-accel', 'tcg,thread=multi,skew=1000000,skew-ips=2000000000,'
                          'skew-update=100000',
                '-kernel', str(args.kernel), '-initrd', str(archive),
                '-append', 'console=ttyAMA0 earlycon rdinit=/init nokaslr loglevel=7']
         (args.output / 'command.json').write_text(json.dumps(cmd, indent=2))
         with (args.output / 'qemu.log').open('w') as qlog, \
-             (args.output / 'serial.log').open('wb') as slog:
+             (args.output / 'serial.log').open('wb') as slog, \
+             closing(QemuPipe(qpath, timeout=200)) as qstream, \
+             closing(QemuPipe(spath, timeout=200)) as serial:
             proc = subprocess.Popen(cmd, stdout=qlog, stderr=subprocess.STDOUT)
-            qsock = connect(qpath, proc)
-            serial = connect(spath, proc)
-            qmp = QMP(qsock)
+            qstream.process = serial.process = proc
+            qmp = None
             text = bytearray()
             samples = []
             next_sample = time.monotonic()
             try:
+                qmp = QMP(qstream)
                 while b'JITTER_TEST_PASS' not in text:
-                    chunk = serial.recv(65536)
+                    chunk = serial.read(65536)
                     if not chunk:
                         raise RuntimeError('serial disconnected')
                     text.extend(chunk)
@@ -141,14 +128,12 @@ def main():
                 (args.output / 'qmp.json').write_text(json.dumps(qmp.records, indent=2))
                 print(f'PASS: jitter init and 256 reads; samples={len(samples)}')
             finally:
-                (args.output / 'qmp.json').write_text(
-                    json.dumps(qmp.records, indent=2))
+                if qmp:
+                    (args.output / 'qmp.json').write_text(
+                        json.dumps(qmp.records, indent=2))
                 if proc.poll() is None:
                     proc.kill()
                     proc.wait()
-                serial.close()
-                qmp.stream.close()
-                qsock.close()
 
 
 if __name__ == '__main__':

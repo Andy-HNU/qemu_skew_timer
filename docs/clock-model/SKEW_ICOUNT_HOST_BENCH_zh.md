@@ -1,7 +1,7 @@
 # skew / icount 的 host time 基准
 
 该基准比较固定有用计算工作量的宿主墙钟耗时，不使用 guest 时间作为成绩。
-[已完成的 WSL2 对比报告及原始数据](benchmarks/20260914-host/REPORT_zh.md)。
+[历史 WSL2 对比报告及原始数据](https://github.com/Andy-HNU/qemu_skew_timer/tree/17d49d3d497ce9f2235c739acfedcca7e0a0e086/docs/clock-model/benchmarks/20260914-host)。
 源文件位于 `tests/tcg/aarch64/system/skew-perf*`；不改动 QEMU 运行机制。
 
 换机器快速扫描 `2, 4, 6, …` 到自定上限，请使用 [一键扫描入口](SKEW_SWEEP_zh.md)。
@@ -52,11 +52,10 @@ skew 使用 MTTCG、window=1ms、IPS=10^9、update=100us；普通 MTTCG 为辅�
 在仓库根目录、AArch64 交叉工具链和 QEMU plugin 头文件可用的环境中运行：
 
 ```sh
-export PKG_CONFIG_PATH=/home/andy/qemu-build-deps/glib/lib/pkgconfig
-python3.9 tests/tcg/aarch64/system/skew-perf.py \
+python3 tests/tcg/aarch64/system/skew-perf.py \
   --output build/skew-perf-new --work 720384000 --rounds 7
-python3.9 tests/tcg/aarch64/system/skew-perf-report.py \
-  build/skew-perf-new docs/clock-model/benchmarks/new
+python3 tests/tcg/aarch64/system/skew-perf-report.py \
+  build/skew-perf-new build/skew-perf-report-new
 ```
 
 `runs.jsonl` 包含预热和正式样本、完整启动参数、实际工作量与进程总耗时。

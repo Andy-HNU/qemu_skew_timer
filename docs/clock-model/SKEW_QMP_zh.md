@@ -30,7 +30,7 @@ skew:  virtual = shared visible time
 
 ```sh
 -accel tcg,thread=multi,skew=1000000,skew-ips=2000000000,skew-update=100000,skew-defer=on \
--qmp unix:/tmp/skew-qmp.sock,server=on,wait=off
+-qmp unix:build/skew-qmp.sock,server=on,wait=off
 ```
 
 `skew-defer=on` 从 MTTCG 开始；省略时直接从 skew 开始。MTTCG 的原生虚拟时间随宿主单调时钟推进，VM 暂停时冻结。配置这个功能的整个会话仍禁止迁移/快照。
@@ -71,61 +71,26 @@ MTTCG 启动 → /init jitter 初始化
 复现需要 AArch64 静态 libc 交叉工具链、cpio、匹配的内核和 jitter 模块（依赖编入内核）。本机采用 Debian `linux-image-6.1.0-50-cloud-arm64-unsigned_6.1.176-1_arm64.deb`，用 `dpkg-deb -x kernel.deb kernel` 解包，无需安装进宿主。
 
 ```sh
-python3.9 tests/tcg/aarch64/system/skew-linux-switch.py \
+python3 tests/tcg/aarch64/system/skew-linux-switch.py \
   build/qemu-system-aarch64 \
-  --kernel build/linux-jitter-20260916/kernel/boot/vmlinuz-6.1.0-50-cloud-arm64 \
-  --jitter-module build/linux-jitter-20260916/kernel/lib/modules/6.1.0-50-cloud-arm64/kernel/crypto/jitterentropy_rng.ko \
-  --output build/skew-linux-roundtrip-v2
+  --kernel /path/to/arm64-kernel \
+  --jitter-module /path/to/matching/crypto/jitterentropy_rng.ko \
+  --output build/skew-linux-roundtrip
 ```
 
 选择新输出目录可保留历史日志。脚本先检查 prelaunch 往返、重复命令、未配置时的拒绝行为，再分别运行“运行中直接切换”和“暂停后切换”两轮 Linux 测试。
 
-## 2026-09-16 WSL2 实测
+## visible 场景
 
-Debian Linux 6.1.176，2 vCPU、512 MiB、cortex-a57、GICv3；窗口 1 ms、2 GIPS、协调间隔 100 us。
-
-两种切换方式各完成 4 次转换，共 8 次。全部完成 jitter 初始化、guest 时钟和定时器检查并正常关机。每段 skew 两次采样的 active CPU 领先量都在 2,000,000 条指令窗口以内。切回 MTTCG 后 global/raw/local 均为零，active/waiting 关闭，budget-enabled=false；再次启用后两核重新推进。
-
-### 暂停切换的时间连续性
-
-以下均为纳秒；暂停状态下不混入命令之间的执行时间。
-
-| 方向 | 切换前 | 切换后 | MTTCG 累计 | skew 累计 |
-|---|---:|---:|---:|---:|
-| MTTCG → skew | 3030181049 | 3030181049 | 3030181049 | 0 |
-| skew → MTTCG | 3126476425 | 3126476425 | 3030181049 | 96295376 |
-| MTTCG → skew | 3251910819 | 3251910819 | 3155615443 | 96295376 |
-| skew → MTTCG | 3351323580 | 3351323580 | 3155615443 | 195708137 |
-
-每行切换前后相等，且两个累计量之和等于可见时间。恢复运行后只有当前模式的贡献继续增加，暂停期间两者都冻结。
-
-### 首段 skew 的两次 CPU 状态采样
-
-取运行中切换这一轮。两次查询之间间隔约 30 ms 宿主时间。
-
-| 采样 | CPU | global | raw / local | lead | active | waiting | budget-enabled |
-|---|---:|---:|---:|---:|---|---|---|
-| 1 | 0 | 5898234 | 5898234 | 0 | true | false | true |
-| 1 | 1 | 5898234 | 6160290 | 262056 | true | false | true |
-| 2 | 0 | 8470076 | 8470076 | 0 | true | false | true |
-| 2 | 1 | 8470076 | 10339006 | 1868930 | true | false | true |
-
-这里 raw 和 local 相等，因为采样时这两核尚未空闲重定位；一般情况下不要求两者相等。两个核的状态标志在这两次采样中相同，进度持续增加。其他 skew 阶段的两次完整快照也保留在 JSON 中。
-
-原始结果位于 `build/skew-linux-roundtrip-v2/`，包含 results.json、control-results.json、各轮 serial.log 和完整 qmp.json。原有 `skew-check.py --quick` 回归结果位于 `build/skew-roundtrip-regression/`。第一次高频读取计数器的探索运行主动中止，未纳入此报告；正式负载在计数器读取间加入纯计算。
-
-本测试不等同于特定软件看门狗的完整验收，也未验证熵质量。进入 skew 后继续使用 jitter 仍可能失败；切换时机由外部控制器决定。两个模式的累计量用于虚拟时间组成，skew-ips 不代表与宿主墙钟同速。
-
-## visible 场景的实现和验收
-
-完整状态、字段与锁顺序见 [visible 双向切换](SKEW_VISIBLE_SWITCH_zh.md)。
-定向测试使用实际时钟/CPU 切换函数、QEMU atomics、seqlock 和 QemuEvent：
+状态、字段与锁顺序见 [visible 双向切换](SKEW_VISIBLE_SWITCH_zh.md)。
+定向测试提取实际时钟/CPU 切换函数，使用 QEMU atomics 和 seqlock；
+发布线程在每次切换前停稳，生产 getter 不增加读者登记。
+实际 VM 停核、TB unwind、设备和 ARM System Counter 需要 Linux/guest 集成测试。
 
 ```sh
 python3 tests/tcg/aarch64/system/skew-visible-switch.py --build-dir build
 ```
 
-覆盖 visible 领先/落后 model、未结算插值、窗口饱和、旧阶段读者暂停后
-再发布、新读者等待提交，以及四个并发读者下的 1000 次双向切换。
-Linux 脚本追加 visible/model 偏差、斜率、暂停切换重锚检查；不依赖运行
-30 ms 后每核 raw 必须已经发布这一假设。
+本测试不等同于特定软件看门狗验收或熵质量证明。
+两个模式的累计量用于虚拟时间组成，skew-ips 不代表与宿主墙钟同速。
+历史实测记录见[整理前文档](https://github.com/Andy-HNU/qemu_skew_timer/blob/17d49d3d497ce9f2235c739acfedcca7e0a0e086/docs/clock-model/SKEW_QMP_zh.md)。

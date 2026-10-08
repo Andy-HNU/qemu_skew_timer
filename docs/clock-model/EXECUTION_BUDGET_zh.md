@@ -38,33 +38,14 @@ TB 执行层需要的预算事件协议。未来模型实现自己的预算生�
 窗口、慢核、压力测试及传统 icount 对照；上游选定回归检查定时器、AIO、QMP
 与 ARM 启动。此重构不新增时间策略，也不声明真实设备业务或生产性能验收。
 
-## 本机验证结果
-
-WSL2 Ubuntu 20.04，GCC 10.5，AArch64 GCC 9.4，QEMU `-O2`、调试断言、
-`-Werror`、log trace 与插件开启：
-
-- `qemu-system-aarch64` 编译通过。
-- 完整 `skew-check.py`：47 组通过，含普通 MTTCG 和原生 icount 对照。
-- 预算接口单测 4 项通过；与选定上游回归合计 11 组、645 个子测试通过。
-- 结构检查通过：`cpu_loop_exec_tb()` 不访问模型私有预算、不调用 icount 更新；
-  icount 实现没有 skew 分支；skew 不直接访问 icount 私有预算或底层递减器。
-
-本次本机日志：`build/exec-budget-final-build.log`、
-`build/exec-budget-acceptance.log`、`build/exec-budget-acceptance/results.json`、
-`build/exec-budget-regression.log`。完整 trace/Guest ELF 在验收输出目录中保留。
-
-## 删除 quantum 后的验证
+## 预算容量与验证
 
 每轮额度改为 `min(UINT16_MAX, window - lead)`，只受剩余窗口和 TCG 容量限制。
 `skew-update` 保留 1..1,000,000,000ns 范围检查，但不再要求对应至少一条指令。
-新增回归使用 IPS=100,000,000、window=100ns、update=1ns：轮询间隔仅相当于
-0.1 条指令，仍成功启动并通过 36/226/36 条精确计数及暂停冻结检查。
-
-重建通过；完整验收增至 48 组，全部通过；预算单测与选定上游回归共 11 组、
-645 个子测试全部通过。日志保存在 `build/no-quantum-build.log`、
-`build/no-quantum-acceptance/`、`build/no-quantum-acceptance.log` 和
-`build/no-quantum-regression.log`。
-
+回归使用 IPS=100,000,000、window=100ns、update=1ns，轮询间隔仅相当于
+0.1 条指令，检查精确计数及暂停冻结。当前命令与判定见
+[测试说明](TEST_ACCEPTANCE_zh.md)，历史通过数字和本机日志说明见
+[整理前文档](https://github.com/Andy-HNU/qemu_skew_timer/blob/17d49d3d497ce9f2235c739acfedcca7e0a0e086/docs/clock-model/EXECUTION_BUDGET_zh.md)。
 
 ## 执行窗口越界检测
 

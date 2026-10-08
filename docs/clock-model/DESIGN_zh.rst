@@ -18,9 +18,7 @@ QEMU时钟重构探索
 
 为了方便讨论，将问题简化为同 QEMU 场景下的双核收发包。
 
-.. image:: 2026-09-03-16-14-36.png
-
-图：wall time 场景下同 QEMU 双核收发包超时场景示意。
+wall time 场景下，同 QEMU 的接收核处理速度不足时，发送核可能先超时。
 
 
 slowtime
@@ -29,8 +27,6 @@ slowtime
 早期解决方案是降低整体 syscnt 时钟流速。
 
 如果 Core1 在 Host 上需要更长时间完成处理，可以在 syscnt 计算中加入 slowtime 倍数，使 Guest 看到的时间流速按照固定比例下降。
-
-.. image:: 2026-09-03-16-14-49.png
 
 
 软件时间获取接口
@@ -132,8 +128,6 @@ batch icount
 
 一种直接的方式是限制所有 Core 每次最多执行固定数量的 ``batch`` 指令，所有 Core 到达 batch 边界后统一推进时钟。
 
-.. image:: 2026-09-03-16-31-30.png
-
 这种方式存在一个明显问题：batch 同时承担了执行同步粒度和时间更新粒度。
 
 如果 batch 设置得非常大，System Counter 会长时间保持不变。
@@ -167,8 +161,6 @@ skew Keeper
     local_time <= global_time + skew
 
 当快 Core 到达 skew 上限后停止继续执行，等待系统整体时间向前推进。
-
-.. image:: 2026-09-03-19-32-26.png
 
 这个方案需要注意几个问题：
 
@@ -279,8 +271,6 @@ QEMU 主线程读取所有 active CPU：
 
 这种方式可以保持一个持续移动的滑动窗口：
 
-.. image:: 2026-09-03-19-33-02.png
-
 每个 CPU 需要维护：
 
 .. code-block:: text
@@ -311,8 +301,6 @@ QEMU 主线程读取所有 active CPU：
 如果需要解决 MPT 和 BBP 分属不同 QEMU 的问题，还需要建立跨 QEMU 的统一时间。
 
 一种可行方案是搭设 Time Server。各 QEMU 本地读取所有 active Core 的 raw icount，换算出本实例当前的安全时间进度，再由独立通信线程与 Time Server 交互。
-
-.. image:: 2026-09-04-14-30-08.png
 
 具体思路如下：
 
@@ -414,8 +402,6 @@ QEMU 主线程读取所有 active CPU：
 跨 QEMU 时间同步需要额外的网络通信、节点状态管理和故障处理。
 
 如果 QEMU 内部已经能够通过 icount 控制各个 vCPU 的执行进度，并建立统一 System Counter，那么同 QEMU 场景可以完全在进程内部完成时间协调。
-
-.. image:: 2026-09-07-09-57-45.png
 
 单 QEMU 方案中，每个 vCPU 维护自己的 ``raw_icount``。QEMU 主线程作为 Time Coordinator，维护唯一的 ``global_icount``。
 

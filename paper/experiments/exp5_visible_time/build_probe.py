@@ -27,7 +27,9 @@ def main():
     s=replace_once(s,"static Error *migration_blocker;","static Error *migration_blocker;\n"+(HERE/"probe.inc.c").read_text())
     s=replace_once(s,"    coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);",
                    "    exp5_init();\n    coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);")
-    s=replace_once(s,"    return next;\n}\n\nint64_t skew_get_clock",'''    if (exp5_in_counter && exp5_path) {
+    s=replace_once(s,"    next = skew_publish_visible(predicted);\n    return next;",
+                  '''    next = skew_publish_visible(predicted);
+    if (exp5_in_counter && exp5_path) {
         exp5_pending = (Exp5Sample) {
             .host = cpu_get_clock(), .model = model, .visible = next,
             .global = global_icount, .window = window_ns, .slope = slope,
@@ -35,10 +37,7 @@ def main():
             .event = next == upper ? "bound_hit" : "read",
         };
     }
-    return next;
-}
-
-int64_t skew_get_clock''')
+    return next;''')
     s=replace_once(s,"    trace_skew_clock(host_ns, global_icount, now, active);",
                    '    exp5_event("update");\n    trace_skew_clock(host_ns, global_icount, now, active);')
     s, count = re.subn(r'(        trace_skew_cpu\(qemu_clock_get_ns\(QEMU_CLOCK_REALTIME\),\n\s+cpu->cpu_index, true)',
@@ -66,17 +65,23 @@ int64_t skew_get_clock''')
         argv += ["-iquote",str(ROOT/("target/arm" if path.stem=="helper" else "accel/tcg"))]
         commands.append(argv); subprocess.run(argv,cwd=build,check=True)
         replacements[obj]=str(output)
-    ninja=(build/"build.ninja").read_text()
-    match=re.search(r"^build qemu-system-aarch64: c_LINKER_RSP (.*)\n LINK_ARGS = (.*)$",ninja,re.M)
-    if not match: raise ValueError("unsupported linker rule")
-    objects=shlex.split(match[1].split(" |")[0])
-    objects=[replacements.get(x,x) for x in objects]
+    # Let Ninja expand its response-file rule instead of parsing build.ninja.
+    entries=json.loads(subprocess.check_output(
+        ["ninja","-t","compdb","-x","c_LINKER_RSP"],cwd=build,text=True))
+    links=[entry for entry in entries if entry.get("output")=="qemu-system-aarch64"]
+    if len(links)!=1: raise ValueError("unsupported linker rule: expected one QEMU link command")
+    argv=shlex.split(links[0]["command"])
+    for obj in replacements:
+        if argv.count(obj)!=1: raise ValueError("unexpected linker object: "+obj)
+    argv=[replacements.get(x,x) for x in argv]
     binary=out/"qemu-system-aarch64"
-    argv=["gcc-10","-m64","-o",str(binary)]+objects+shlex.split(match[2])
+    if argv.count("-o")!=1: raise ValueError("unsupported linker output option")
+    output_index=argv.index("-o")
+    argv[output_index+1]=str(binary)
     # Response-file linking avoids ARG_MAX and records the exact invocation.
-    rsp=out/"link.rsp";rsp.write_text(" ".join(shlex.quote(x) for x in argv[2:]))
+    rsp=out/"link.rsp";rsp.write_text(" ".join(shlex.quote(x) for x in argv[output_index:]))
     commands.append(argv)
-    subprocess.run(argv[:2]+["@"+str(rsp)],cwd=build,check=True)
+    subprocess.run(argv[:output_index]+["@"+str(rsp)],cwd=build,check=True)
     assert original=={x:sha(x) for x in original}, "baseline changed"
     manifest={"baseline_commit":subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),
               "original_sha256":original,"generated_sha256":{str(x):sha(x) for x in (out/"skew.c",out/"helper.c",binary)},
