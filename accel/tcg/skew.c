@@ -32,6 +32,8 @@ static uint64_t sim_ips, window, update_interval, window_ns;
 static int64_t start_ns;
 /* 当前 skew 阶段的全局进度单调不减，切换模式时清零。 */
 static uint64_t global_icount;
+/* BQL → progress_lock；持有此锁时不获取 BQL，也不访问定时器队列。 */
+static QemuMutex progress_lock;
 /* 两种模式累计贡献的纳秒数；MTTCG 当前阶段增量在读取时补入。 */
 static aligned_int64_t mttcg_elapsed_ns, skew_elapsed_ns;
 static aligned_int64_t mttcg_start_clock;
@@ -209,6 +211,7 @@ SkewClockInfo *qmp_query_skew_clock(Error **errp)
         error_setg(errp, "Configure -accel tcg,thread=multi,skew=NS first");
         return NULL;
     }
+    qemu_mutex_lock(&progress_lock);
     info = g_new0(SkewClockInfo, 1);
     info->mode = skew_enabled() ? SKEW_CLOCK_MODE_SKEW : SKEW_CLOCK_MODE_MTTCG;
     info->virtual_ns = skew_get_clock();
@@ -250,6 +253,7 @@ SkewClockInfo *qmp_query_skew_clock(Error **errp)
         *tail = entry;
         tail = &entry->next;
     }
+    qemu_mutex_unlock(&progress_lock);
     return info;
 }
 
@@ -328,7 +332,7 @@ static uint64_t skew_feedback_slope(uint64_t momentum, int64_t bias,
     return MIN(momentum + correction, SKEW_SLOPE_ONE);
 }
 
-/* BQL serializes membership, rebasing, and the sole clock writer. */
+/* BQL protects VM state; progress_lock serializes window predicates and wakes. */
 /* 协调器周期：采样各 CPU、推进全局时间、处理空闲跳时、唤醒边界等待者。 */
 static void skew_update(void *opaque)
 {
@@ -336,6 +340,7 @@ static void skew_update(void *opaque)
     uint64_t candidate = UINT64_MAX;
     uint64_t completed = global_icount;
     unsigned active = 0;
+    bool idle;
     int64_t now, deadline = -1, visible, lower, upper;
     uint64_t delta_icount, slope, delta_t_ns;
     int64_t elapsed_now;
@@ -348,6 +353,13 @@ static void skew_update(void *opaque)
         return;
     }
 
+    /* 定时器队列可能持有其他锁；查询必须在进度临界区之外。 */
+    idle = all_cpu_threads_idle();
+    if (idle) {
+        deadline = qemu_clock_deadline_ns_all(QEMU_CLOCK_VIRTUAL,
+                                             QEMU_TIMER_ATTR_ALL);
+    }
+    qemu_mutex_lock(&progress_lock);
     /* ponytail: O(vCPU count) scan; shard only if profiling justifies it. */
     CPU_FOREACH(cpu) {
         uint64_t raw = qatomic_read_u64(&cpu->skew_raw_icount);
@@ -366,7 +378,7 @@ static void skew_update(void *opaque)
     /* MAX 保证进度不倒退；全空闲时改用已完成尾部的最大值。 */
     if (active) {
         global_icount = MAX(global_icount, candidate);
-    } else if (all_cpu_threads_idle()) {
+    } else if (idle) {
         /* Commit the final executed tail before entering idle time. */
         global_icount = completed;
     }
@@ -380,9 +392,7 @@ static void skew_update(void *opaque)
      * 只有没有活跃成员且所有线程确实空闲，才跳到最近虚拟定时器。
      * 领先窗口等待者保持 active，不能误触发此跳时路径。
      */
-    if (!active && all_cpu_threads_idle()) {
-        deadline = qemu_clock_deadline_ns_all(QEMU_CLOCK_VIRTUAL,
-                                             QEMU_TIMER_ATTR_ALL);
+    if (!active && idle) {
         if (deadline > 0) {
             warp_ns += deadline;
             now += deadline;
@@ -422,16 +432,17 @@ static void skew_update(void *opaque)
     qatomic_set_i64(&skew_elapsed_ns, visible - mttcg_elapsed_ns);
     seqlock_write_end(&clock_seqlock);
     trace_skew_clock(host_ns, global_icount, now, active);
-    /* 时间变化或定时器已到期时通知虚拟时钟，促使设备回调得到处理。 */
-    if (now != old_ns || deadline == 0) {
-        qemu_clock_notify(QEMU_CLOCK_VIRTUAL);
-    }
     CPU_FOREACH(cpu) {
         /* 窗口出现余量时唤醒等待线程；线程恢复后仍会重新检查等待条件。 */
         if (cpu->skew_waiting &&
             logical_count(cpu) - global_icount < window) {
             qemu_cond_signal(cpu->halt_cond);
         }
+    }
+    qemu_mutex_unlock(&progress_lock);
+    /* 设备通知留在进度临界区之外，避免引入反向锁序。 */
+    if (now != old_ns || deadline == 0) {
+        qemu_clock_notify(QEMU_CLOCK_VIRTUAL);
     }
     /* 无活跃 CPU 且无虚拟定时器时至少隔 10ms 轮询，减少宿主空转。 */
     timer_mod(coordinator, qemu_clock_get_ns(QEMU_CLOCK_REALTIME) +
@@ -477,6 +488,7 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
     sim_ips = ips;
     window_ns = ns;
     update_interval = update_ns;
+    qemu_mutex_init(&progress_lock);
     coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);
     qemu_add_vm_change_state_handler(skew_vm_state, NULL);
     skew_momentum_reset(0);
@@ -613,6 +625,7 @@ SkewClockInfo *qmp_skew_stop(Error **errp)
 void skew_cpu_idle(CPUState *cpu)
 {
     assert(bql_locked());
+    qemu_mutex_lock(&progress_lock);
     if (cpu->skew_active &&
         (cpu->stop || cpu_thread_is_idle(cpu) || !runstate_is_running())) {
         cpu->skew_active = false;
@@ -620,6 +633,7 @@ void skew_cpu_idle(CPUState *cpu)
                        cpu->cpu_index, false, cpu->skew_raw_icount,
                        logical_count(cpu), global_icount);
     }
+    qemu_mutex_unlock(&progress_lock);
 }
 
 /* 16 位槽只是执行分段；沿发放时的 global 快照续配仍满足同一个窗口。 */
@@ -646,6 +660,7 @@ void skew_cpu_prepare(CPUState *cpu)
 {
 
     assert(bql_locked());
+    qemu_mutex_lock(&progress_lock);
     /* 保留累计 raw，以新的 raw_base/logical_base 消除休眠期间的历史落后。 */
     if (!cpu->skew_active) {
         int64_t visible = skew_get_clock();
@@ -671,6 +686,7 @@ void skew_cpu_prepare(CPUState *cpu)
                        logical_count(cpu), global_icount);
     }
     skew_cpu_refill(cpu, global_icount);
+    qemu_mutex_unlock(&progress_lock);
 }
 
 /*
@@ -708,20 +724,25 @@ void skew_cpu_account(CPUState *cpu)
     exec_budget_set(cpu, 0);
 }
 
-/* 到达窗口边界才等待；停机、中断退出、异步工作或 halt 都能打破等待。 */
-void skew_cpu_wait(CPUState *cpu)
+/*
+ * tcg_cpu_exec 已结束执行/RCU 临界区。纯预算退出可等待并续配，不经过 BQL。
+ * stop、interrupt 和异步工作都经过 kick；退出标志优先于再次执行。
+ */
+bool skew_cpu_continue(CPUState *cpu)
 {
-    assert(bql_locked());
-    while (cpu->skew_active && !cpu->stop && !cpu->halted &&
-           runstate_is_running() && cpu_work_list_empty(cpu) &&
-           !qatomic_read(&cpu->exit_request) &&
+    bool resume;
+
+    assert(!bql_locked());
+    qemu_mutex_lock(&progress_lock);
+    while (cpu->skew_active && cpu_work_list_empty(cpu) &&
+           !qatomic_load_acquire(&cpu->exit_request) &&
            logical_count(cpu) - global_icount == window) {
         cpu->skew_waiting = true;
         trace_skew_wait(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
                         cpu->cpu_index, true, cpu->skew_raw_icount,
                         logical_count(cpu), global_icount);
-        /* 释放 BQL 后睡眠，让协调器及其他 CPU 前进；醒来取得 BQL 并重查条件。 */
-        qemu_cond_wait_bql(cpu->halt_cond);
+        /* 每个 CPU 只有本线程等待 halt_cond；条件检查和 kick 通知共用此锁。 */
+        qemu_cond_wait(cpu->halt_cond, &progress_lock);
     }
     /* 记录等待结束，便于 trace 重建限速行为；并非每次唤醒都一定获得预算。 */
     if (cpu->skew_waiting) {
@@ -730,6 +751,21 @@ void skew_cpu_wait(CPUState *cpu)
                         cpu->cpu_index, false, cpu->skew_raw_icount,
                         logical_count(cpu), global_icount);
     }
+    resume = cpu_work_list_empty(cpu) &&
+             !qatomic_load_acquire(&cpu->exit_request);
+    if (resume) {
+        resume = skew_cpu_refill(cpu, global_icount) != 0;
+    }
+    qemu_mutex_unlock(&progress_lock);
+    return resume;
+}
+
+/* 标志先由 TCG kick 发布；同一互斥锁避免通知落在条件检查和入睡之间。 */
+void skew_cpu_kick(CPUState *cpu)
+{
+    qemu_mutex_lock(&progress_lock);
+    qemu_cond_signal(cpu->halt_cond);
+    qemu_mutex_unlock(&progress_lock);
 }
 
 static bool skew_budget_exhausted(CPUState *cpu)

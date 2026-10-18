@@ -38,8 +38,10 @@ void skew_cpu_idle(CPUState *cpu);
 void skew_cpu_prepare(CPUState *cpu);
 /* 由 vCPU 执行线程结算本轮完成量并清空预算。 */
 void skew_cpu_account(CPUState *cpu);
-/* 持有 BQL：到达窗口边界时等待；等待操作会释放并重新取得 BQL。 */
-void skew_cpu_wait(CPUState *cpu);
+/* 不持有 BQL：纯预算退出可等待窗口并续配；控制请求返回 false。 */
+bool skew_cpu_continue(CPUState *cpu);
+/* TCG 发布异步退出标志后调用；唤醒窗口等待，内部只获取进度锁。 */
+void skew_cpu_kick(CPUState *cpu);
 
 /* 此时间模型提供的公共执行预算回调。 */
 extern const struct TCGExecutionBudgetOps skew_budget_ops;

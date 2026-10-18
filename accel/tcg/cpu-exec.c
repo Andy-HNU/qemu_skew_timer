@@ -38,6 +38,7 @@
 #include "qemu/main-loop.h"
 #include "exec/icount.h"
 #include "exec/exec-budget.h"
+#include "exec/skew.h"
 #include "exec/replay-core.h"
 #include "system/tcg.h"
 #include "exec/helper-proto-common.h"
@@ -764,6 +765,11 @@ void tcg_kick_vcpu_thread(CPUState *cpu)
 
     /* Ensure cpu_exec will see the exit request after TCG has exited.  */
     qatomic_store_release(&cpu->neg.icount_decr.u16.high, -1);
+#ifndef CONFIG_USER_ONLY
+    if (skew_configured()) {
+        skew_cpu_kick(cpu);
+    }
+#endif
 }
 
 /* 公共层处理非计数 TB 例外，再交给所选模型判断整轮预算。 */

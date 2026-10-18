@@ -49,6 +49,23 @@ Linux 启动、线程和系统调用等其他指令另计。
 墙钟和 CPU 时间覆盖整个 QEMU 进程，不能由此推算生成代码执行占比。
 本入口不验证 jitterentropy 初始化或熵质量。
 
+## P2：无 BQL 窗口等待
+
+`build/p2-quick` 的 15 项真实 Guest 检查全部通过；插值采样及模式切换定向回归通过。
+等待发生在 tcg_cpu_exec / cpu_exec_end / RCU 读侧临界区结束之后。
+TCG kick 先发布退出请求，再持有进度锁通知 halt_cond，避免检查与入睡之间漏通知。
+定时器队列查询和设备通知位于进度锁之外，锁序为 BQL → progress_lock。
+
+```sh
+timeout 150 python3 tests/tcg/aarch64/system/skew-linux-efficiency.py \
+    build/qemu-p2 --kernel build/assets/Image --switch \
+    --output build/p2-linux32-switch --timeout 120
+```
+
+32 vCPU Linux 通过两阶段的完整计算、MTTCG/skew 双向转换，以及各阶段
+实际工作开始后的暂停/恢复；暂停前后时钟和全部 CPU 状态相同，正常关机。
+这组含控制操作，未作为性能样本使用。
+
 ## 后续阶段
 
-P2/P3 的同步交错、32 vCPU 控制、完整回归及重复性能比较待实现后记录。
+P3 的进度发布、完整回归及重复性能比较待实现后记录。

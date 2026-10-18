@@ -44,3 +44,4 @@ skew_sample(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t raw_ba
 # Every grant is bounded by this completed progress snapshot.
 skew_budget(int cpu, uint64_t logical, uint64_t global, uint32_t budget) "cpu=%d logical=%"PRIu64" global=%"PRIu64" budget=%u"
 skew_run(int cpu, int reason) "cpu=%d reason=%d"
+skew_outer(int cpu, int reason) "cpu=%d reason=%d"

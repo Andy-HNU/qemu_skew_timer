@@ -101,16 +101,21 @@ static void *mttcg_cpu_thread_fn(void *arg)
                 skew_cpu_prepare(cpu);
             }
             bql_unlock();
-            r = tcg_cpu_exec(cpu);
-            /* 先完成原子指令的独占重试，再统一结算；改写返回码避免 switch 重复执行。 */
-            if (skew_enabled() && r == EXCP_ATOMIC) {
-                cpu_exec_step_atomic(cpu);
-                r = EXCP_INTERRUPT;
-            }
+            do {
+                r = tcg_cpu_exec(cpu);
+                /* 原子指令的独占重试先完成，再统一结算。 */
+                if (skew_enabled() && r == EXCP_ATOMIC) {
+                    cpu_exec_step_atomic(cpu);
+                    r = EXCP_INTERRUPT;
+                }
+                if (skew_enabled()) {
+                    skew_cpu_account(cpu);
+                    trace_skew_run(cpu->cpu_index, r);
+                }
+            } while (skew_enabled() && r == EXCP_INTERRUPT &&
+                     skew_cpu_continue(cpu));
             if (skew_enabled()) {
-                /* 仍在 vCPU 线程内发布完成量；协调器通过原子读取观察该计数。 */
-                skew_cpu_account(cpu);
-                trace_skew_run(cpu->cpu_index, r);
+                trace_skew_outer(cpu->cpu_index, r);
             }
             bql_lock();
             switch (r) {
@@ -130,10 +135,6 @@ static void *mttcg_cpu_thread_fn(void *arg)
             default:
                 /* Ignore everything else? */
                 break;
-            }
-            if (skew_enabled()) {
-                /* 重新持有 BQL 后检查领先上限，必要时睡眠并让出 BQL。 */
-                skew_cpu_wait(cpu);
             }
         }
     } while (!cpu->unplug || cpu_can_run(cpu));

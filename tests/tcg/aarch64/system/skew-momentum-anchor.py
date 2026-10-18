@@ -44,6 +44,11 @@ prefix = r"""
 #define QEMU_CLOCK_VIRTUAL 1
 #define QEMU_TIMER_ATTR_ALL 0
 typedef unsigned QemuSeqLock;
+typedef unsigned QemuMutex;
+static QemuMutex progress_lock;
+/* This existing fixture is single threaded; real guest tests exercise locking. */
+static void qemu_mutex_lock(QemuMutex *lock) { }
+static void qemu_mutex_unlock(QemuMutex *lock) { }
 typedef struct CPUState {
     uint64_t skew_raw_icount, skew_raw_base, skew_logical_base;
     uint64_t skew_budget_global;
