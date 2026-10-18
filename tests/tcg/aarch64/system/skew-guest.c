@@ -175,6 +175,12 @@ void guest_main(u64 cpu)
         }
         check(matched > 0);
         record("CNTVOFF", 1234, matched);
+    } else if (MODE == 13) {
+        /* 跨越 16 位槽和整个窗口；GDB 在每个循环的真实边界读取完成计数。 */
+        short_loop(32766);
+        short_loop(32767);
+        long_loop(6250);
+        fault_probe();
     } else if (MODE == 9) {
         /* 小循环配合极小 skew 窗口，覆盖 TB 被预算截断时的精确计数。 */
         short_loop(17);

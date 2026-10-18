@@ -40,3 +40,7 @@ skew_wait(int64_t host_ns, int cpu, bool waiting, uint64_t raw, uint64_t logical
 skew_warp(int64_t host_ns, uint64_t global, int64_t ns, int64_t delta) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" delta=%"PRId64
 # 协调更新前的逐 CPU 快照，供验收复算逻辑进度及窗口上限。
 skew_sample(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t raw_base, uint64_t logical_base, uint64_t logical) "host_ns=%"PRId64" cpu=%d active=%d raw=%"PRIu64" raw_base=%"PRIu64" logical_base=%"PRIu64" logical=%"PRIu64
+
+# Every grant is bounded by this completed progress snapshot.
+skew_budget(int cpu, uint64_t logical, uint64_t global, uint32_t budget) "cpu=%d logical=%"PRIu64" global=%"PRIu64" budget=%u"
+skew_run(int cpu, int reason) "cpu=%d reason=%d"

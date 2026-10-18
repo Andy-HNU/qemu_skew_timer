@@ -18,7 +18,7 @@ source = (ROOT / "accel/tcg/skew.c").read_text()
 
 
 def function(name):
-    match = re.search(r"^(?:static )?(?:uint64_t|int64_t|void) " + name +
+    match = re.search(r"^(?:static )?(?:uint16_t|uint64_t|int64_t|void) " + name +
                       r"\(.*?\n\}", source, re.M | re.S)
     if not match:
         raise RuntimeError(f"Function not found: {name}")
@@ -89,11 +89,12 @@ static void exec_budget_set(CPUState *cpu, uint32_t budget)
 #define trace_skew_warp(host, ...) ((void)(host))
 #define trace_skew_clock(host, ...) ((void)(host))
 #define trace_skew_cpu(...) ((void)0)
+#define trace_skew_budget(...) ((void)0)
 """
 names = ["skew_muldiv", "skew_ratio_q32", "skew_publish_visible",
          "skew_visible_clock", "skew_clock_at", "skew_get_clock", "logical_count",
          "skew_momentum_rebase", "skew_momentum_reset", "skew_momentum_add", "skew_feedback_slope",
-         "skew_update", "skew_cpu_prepare"]
+         "skew_update", "skew_cpu_refill", "skew_cpu_prepare"]
 functions = "\n\n".join(function(name) for name in names)
 suffix = r"""
 static void rejoin(int64_t when, uint64_t progress)

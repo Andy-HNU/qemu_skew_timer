@@ -622,10 +622,28 @@ void skew_cpu_idle(CPUState *cpu)
     }
 }
 
+/* 16 位槽只是执行分段；沿发放时的 global 快照续配仍满足同一个窗口。 */
+static uint16_t skew_cpu_refill(CPUState *cpu, uint64_t grant_global)
+{
+    uint64_t local = logical_count(cpu);
+    uint64_t lead = local - grant_global;
+
+    if (unlikely(local < grant_global || lead > window)) {
+        error_report("skew: CPU %d invalid refill: local=%" PRIu64
+                     " grant_global=%" PRIu64 " window=%" PRIu64,
+                     cpu->cpu_index, local, grant_global, window);
+        abort();
+    }
+    cpu->skew_budget_global = grant_global;
+    cpu->skew_budget = MIN(UINT16_MAX, window - lead);
+    exec_budget_set(cpu, cpu->skew_budget);
+    trace_skew_budget(cpu->cpu_index, local, grant_global, cpu->skew_budget);
+    return cpu->skew_budget;
+}
+
 /* 准备下一轮执行：重新加入的 CPU 从当前全局逻辑进度起跑。 */
 void skew_cpu_prepare(CPUState *cpu)
 {
-    uint64_t lead;
 
     assert(bql_locked());
     /* 保留累计 raw，以新的 raw_base/logical_base 消除休眠期间的历史落后。 */
@@ -652,19 +670,7 @@ void skew_cpu_prepare(CPUState *cpu)
                        cpu->cpu_index, true, cpu->skew_raw_icount,
                        logical_count(cpu), global_icount);
     }
-    /* 只受剩余窗口和 TCG 16 位装载上限约束，无独立的执行分段策略。 */
-    lead = logical_count(cpu) - global_icount;
-    /* 常驻检查：禁止无符号减法下溢后发放错误预算。 */
-    if (unlikely(lead > window)) {
-        error_report("skew: CPU %d window exceeded before execution: "
-                     "lead=%" PRIu64 " window=%" PRIu64,
-                     cpu->cpu_index, lead, window);
-        abort();
-    }
-    /* 保存发放时的全局进度；无 BQL 结算时不读取并发变化的 global。 */
-    cpu->skew_budget_global = global_icount;
-    cpu->skew_budget = MIN(UINT16_MAX, window - lead);
-    exec_budget_set(cpu, cpu->skew_budget);
+    skew_cpu_refill(cpu, global_icount);
 }
 
 /*
@@ -728,12 +734,17 @@ void skew_cpu_wait(CPUState *cpu)
 
 static bool skew_budget_exhausted(CPUState *cpu)
 {
-    return exec_budget_remaining(cpu) == 0;
+    if (exec_budget_remaining(cpu)) {
+        return false;
+    }
+    /* 先发布实际完成量，再沿本轮安全窗口续配，无需退出到 MTTCG/BQL。 */
+    skew_cpu_account(cpu);
+    return skew_cpu_refill(cpu, cpu->skew_budget_global) == 0;
 }
 
 /*
- * TB 预算到期不发放新窗口，也不推进 global time。保留本轮剩余额度，
- * 由公共层截短 TB；整轮耗尽后仍返回 MTTCG 做 raw 结算和窗口等待。
+ * 未耗尽的短额度交给公共层截短 TB；零额度由 exhausted 完成结算和续配。
+ * 只有耗尽整个窗口才返回 MTTCG，外部退出请求仍由公共层优先处理。
  */
 static uint16_t skew_budget_expired(CPUState *cpu)
 {

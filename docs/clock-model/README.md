@@ -40,6 +40,7 @@ python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
 - [代码导读与同步边界](SKEW_CODE_WIKI_zh.md)
 - [QMP 双向切换](SKEW_QMP_zh.md)
 - [visible 阶段切换契约](SKEW_VISIBLE_SWITCH_zh.md)
+- [CPU 执行效率优化计划](SKEW_CPU_EFFICIENCY_PLAN_zh.md)
 - [动量插值与独立采样锚点](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)
 
 ## 历史结果

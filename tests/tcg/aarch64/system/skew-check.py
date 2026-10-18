@@ -92,7 +92,7 @@ def command(qemu, elf, smp=2, skew=True, ips=2000000000,
 def parse_trace(path, ips, window):
     previous_ns = previous_global = 0
     samples = {}
-    clocks = waits = warps = max_step = max_lead = 0
+    clocks = waits = warps = max_step = max_lead = grants = returns = 0
     warp_ns = 0
     callbacks = []
     for line in path.read_text().splitlines():
@@ -101,6 +101,13 @@ def parse_trace(path, ips, window):
         if "arm_gt_timer_expire " in line:
             assert fields["count"] >= fields["cval"], line
             callbacks.append((fields["count"] - fields["cval"]) * fields["period"])
+        elif "skew_budget " in line:
+            assert 0 <= fields["budget"] <= 65535, line
+            assert (fields["logical"] + fields["budget"] <=
+                    fields["global"] + window * ips // 10**9), line
+            grants += fields["budget"] > 0
+        elif "skew_run " in line:
+            returns += 1
         elif "skew_sample " in line:
             assert fields["logical"] == (fields["logical_base"] + fields["raw"]
                                           - fields["raw_base"]), line
@@ -134,6 +141,7 @@ def parse_trace(path, ips, window):
     assert clocks > 0
     return dict(updates=clocks, waits=waits, warps=warps,
                 max_step_ns=max_step, max_lead_insns=max_lead,
+                budget_grants=grants, execution_returns=returns,
                 callback_lateness_ns=callbacks)
 
 
@@ -190,9 +198,11 @@ def run_guest(qemu, out, mode, skew=True, trace=False, delay_cpu=None,
 
 
 # 用 GDB 起止断点读取 raw 差值；tiny 强制跨越很小的预算边界。
-def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
+def exact_counts(qemu, out, tiny=False, sub_instruction_update=False,
+                 insn_window=None):
     assert not sub_instruction_update or tiny
-    elf = build_guest(out, 9 if tiny else 1)
+    small = tiny or insn_window == 1
+    elf = build_guest(out, 9 if small else 13 if insn_window else 1)
     symbols = {}
     for row in subprocess.check_output(["aarch64-linux-gnu-nm", str(elf)],
                                        text=True).splitlines():
@@ -203,6 +213,9 @@ def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
         temp = Path(temp)
         qp, gp = temp / "qmp", temp / "gdb"
         cmd = command(qemu, elf, smp=1)
+        if insn_window is not None:
+            cmd = command(qemu, elf, smp=1, ips=1000000000,
+                          window=insn_window)
         if tiny:
             cmd = command(qemu, elf, smp=1, window=7, update=3)
         if sub_instruction_update:
@@ -225,7 +238,12 @@ def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
                      ("long_loop", "long_end", 128000002),
                      ("fault_probe", "fault_end", 36)]
             # 极小窗口时采用短工作量，同时保留 MMIO/SVC 的 36 条精确计数验证。
-            if tiny:
+            if insn_window and not small:
+                cases = [("short_loop", "short_end", 65534),
+                         ("short_loop", "short_end", 65536),
+                         ("long_loop", "long_end", 200002),
+                         ("fault_probe", "fault_end", 36)]
+            if small:
                 cases = [("short_loop", "short_end", 36),
                          ("long_loop", "long_end", 226),
                          ("fault_probe", "fault_end", 36)]
@@ -251,6 +269,7 @@ def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
             proc.communicate(timeout=10)
             return dict(exact_counts=results, paused_ns=clock, pause_host_ms=250,
                         tiny_window=tiny,
+                        window_insns=insn_window,
                         sub_instruction_update=sub_instruction_update)
         finally:
             if proc.poll() is None:
@@ -259,7 +278,7 @@ def exact_counts(qemu, out, tiny=False, sub_instruction_update=False):
 
 
 # 验证两个独立 vCPU 线程、暂停冻结、迁移拒绝及 UART 外部唤醒。
-def controls(qemu, out, idle=False):
+def controls(qemu, out, idle=False, host_runtime=True):
     elf = build_guest(out, 10 if idle else 8)
     with tempfile.TemporaryDirectory(prefix="skew-") as temp, ExitStack() as pipes:
         temp = Path(temp)
@@ -302,12 +321,14 @@ def controls(qemu, out, idle=False):
             def runtime(tid):
                 return int(Path(f"/proc/{proc.pid}/task/{tid}/schedstat")
                            .read_text().split()[0])
-            before = [runtime(tid) for tid in tids]
-            start = time.monotonic_ns()
-            time.sleep(0.5)
-            elapsed = time.monotonic_ns() - start
-            runtime_ns = [runtime(tid) - b for tid, b in zip(tids, before)]
-            assert all(t > 0 for t in runtime_ns)
+            runtime_ns = elapsed = None
+            if host_runtime:
+                before = [runtime(tid) for tid in tids]
+                start = time.monotonic_ns()
+                time.sleep(0.5)
+                elapsed = time.monotonic_ns() - start
+                runtime_ns = [runtime(tid) - b for tid, b in zip(tids, before)]
+                assert all(t > 0 for t in runtime_ns)
             prior = 0
             # 反复 stop/cont，暂停期间要求时钟和每核 raw 完全相等，恢复后不得倒退。
             for _ in range(100):
@@ -333,7 +354,9 @@ def controls(qemu, out, idle=False):
             assert proc.returncode == 0 and "PASS" in output, output
             return dict(control_cycles=100, vcpu_threads=tids,
                         vcpu_runtime_ns=runtime_ns, sample_wall_ns=elapsed,
-                        parallel_runtime_ratio=sum(runtime_ns) / elapsed,
+                        parallel_runtime_ratio=(sum(runtime_ns) / elapsed
+                                                if host_runtime else None),
+                        host_runtime_measurement="measured" if host_runtime else "omitted",
                         affinity=affinity[:2], migration_blocked=True,
                         tlbi_broadcast=True, external_uart=True)
         finally:
@@ -365,6 +388,8 @@ def main():
     parser.add_argument("qemu", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--quick", action="store_true")
+    parser.add_argument("--no-host-runtime", action="store_true",
+                        help="explicitly omit /proc schedstat measurement; retain control checks")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     qemu = args.qemu.resolve()
@@ -380,11 +405,16 @@ def main():
     save(exact_counts(qemu, args.output))
     save(exact_counts(qemu, args.output, tiny=True))
     save(exact_counts(qemu, args.output, tiny=True, sub_instruction_update=True))
+    for size in (1, 65535, 65536, 200000):
+        save(exact_counts(qemu, args.output, insn_window=size))
     save(invalid_options(qemu))
-    save(controls(qemu, args.output))
+    save(controls(qemu, args.output, host_runtime=not args.no_host_runtime))
     save(controls(qemu, args.output, idle=True))
     for mode in (1, 2, 3, 4, 12):
-        save(run_guest(qemu, args.output, mode, trace=True))
+        result = run_guest(qemu, args.output, mode, trace=True)
+        if mode == 1:
+            assert result["trace"]["budget_grants"] > result["trace"]["execution_returns"]
+        save(result)
     # 完整矩阵包含普通 MTTCG 对照、不同指令率/窗口、慢核插件和传统 icount。
     if not args.quick:
         for mode in (1, 2, 3, 4):

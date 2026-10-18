@@ -36,6 +36,7 @@
 #include "tcg/startup.h"
 #include "tcg-accel-ops.h"
 #include "tcg-accel-ops-mttcg.h"
+#include "trace.h"
 
 typedef struct MttcgForceRcuNotifier {
     Notifier notifier;
@@ -109,6 +110,7 @@ static void *mttcg_cpu_thread_fn(void *arg)
             if (skew_enabled()) {
                 /* 仍在 vCPU 线程内发布完成量；协调器通过原子读取观察该计数。 */
                 skew_cpu_account(cpu);
+                trace_skew_run(cpu->cpu_index, r);
             }
             bql_lock();
             switch (r) {

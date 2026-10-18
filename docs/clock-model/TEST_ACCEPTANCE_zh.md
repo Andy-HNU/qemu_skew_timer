@@ -15,7 +15,9 @@ python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
 quick 覆盖精确指令计数、很小的窗口与协调间隔、暂停/恢复、idle 唤醒、
 定时器及多核运行检查。去掉 `--quick` 运行完整矩阵，增加基线、IPS/窗口、
 延迟插件与 icount 对照。不要只检查结果文件是否存在；检查脚本退出码、
-各项断言和完整结果。测试需要宿主暴露可用的线程运行统计。
+各项断言和完整结果。默认测量需要宿主暴露可用的线程运行统计。
+在 `/proc` 与 QMP 线程标识不对应的隔离环境中，可显式使用
+`--no-host-runtime` 省略该项测量；功能断言继续执行，相关指标为 `null`。
 
 上述入口及两个 Linux 集成入口使用 QEMU 原生 `pipe:` 字符设备，通过
 `TMPDIR` 下的 POSIX FIFO 传送 QMP、GDB 和串口协议，不需要 Unix/TCP socket。
