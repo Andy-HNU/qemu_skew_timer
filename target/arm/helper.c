@@ -33,6 +33,7 @@
 #include "semihosting/common-semi.h"
 #endif
 #include "cpregs.h"
+#include "skew-counter.h"
 #include "target/arm/gtimer.h"
 #include "qemu/plugin.h"
 
@@ -1552,6 +1553,22 @@ static uint64_t gt_virt_cnt_read(CPUARMState *env, const ARMCPRegInfo *ri)
 {
     uint64_t offset = gt_direct_access_timer_offset(env, GTIMER_VIRT);
     return gt_get_countervalue(env) - offset;
+}
+
+bool arm_skew_counter_read(CPUARMState *env, const ARMCPRegInfo *ri,
+                           uint64_t *value)
+{
+    /*
+     * These two readers only use this CPU's architectural state and the
+     * concurrent virtual-clock reader. Configuration is immutable and mode
+     * switches stop all vCPUs. In particular, do not admit TVAL/CTL readers:
+     * other timer accesses may update timer queues or interrupt state.
+     */
+    if (ri->readfn != gt_cnt_read && ri->readfn != gt_virt_cnt_read) {
+        return false;
+    }
+    *value = ri->readfn(env, ri);
+    return true;
 }
 
 static void gt_cval_write(CPUARMState *env, const ARMCPRegInfo *ri,

@@ -1,4 +1,7 @@
 # See docs/devel/tracing.rst for syntax documentation.
+skew_publish(int64_t host_ns, uint64_t global, unsigned active) "host_ns=%" PRId64 " global=%" PRIu64 " active=%u"
+skew_demand(int64_t host_ns, int cpu, unsigned mode, uint64_t global) "host_ns=%" PRId64 " cpu=%d mode=%u global=%" PRIu64
+skew_fresh(int cpu, uint64_t old, uint64_t current) "cpu=%d old=%" PRIu64 " current=%" PRIu64
 
 # TCG related tracing
 # cpu-exec.c

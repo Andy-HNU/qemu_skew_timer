@@ -20,12 +20,14 @@
 #include "qemu/main-loop.h"
 #include "cpu.h"
 #include "exec/helper-proto.h"
+#include "exec/skew.h"
 #include "exec/target_page.h"
 #include "internals.h"
 #include "cpu-features.h"
 #include "accel/tcg/cpu-ldst.h"
 #include "accel/tcg/probe.h"
 #include "cpregs.h"
+#include "skew-counter.h"
 
 #define SIGNBIT (uint32_t)0x80000000
 #define SIGNBIT64 ((uint64_t)1 << 63)
@@ -1016,6 +1018,12 @@ uint64_t HELPER(get_cp_reg64)(CPUARMState *env, const void *rip)
     uint64_t res;
 
     if (ri->type & ARM_CP_IO) {
+#ifndef CONFIG_USER_ONLY
+        if (skew_counter_fast_enabled() &&
+            arm_skew_counter_read(env, ri, &res)) {
+            return res;
+        }
+#endif
         bql_lock();
         res = ri->readfn(env, ri);
         bql_unlock();

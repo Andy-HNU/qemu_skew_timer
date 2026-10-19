@@ -527,6 +527,8 @@ struct CPUState {
     bool skew_active;
     /* 是否在窗口边界睡眠，协调器据此选择需要唤醒的线程。 */
     bool skew_waiting;
+    /* progress_lock: generation counted among current-boundary waiters. */
+    uint64_t skew_wait_global;
     uint64_t random_seed;
     sigjmp_buf jmp_env;
 

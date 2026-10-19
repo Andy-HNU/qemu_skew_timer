@@ -95,6 +95,9 @@ static void exec_budget_set(CPUState *cpu, uint32_t budget)
 #define trace_skew_clock(host, ...) ((void)(host))
 #define trace_skew_cpu(...) ((void)0)
 #define trace_skew_budget(...) ((void)0)
+#define TRACE_SKEW_PUBLISH 0
+#define trace_event_get_state_backends(event) false
+#define trace_skew_publish(...) ((void)0)
 """
 names = ["skew_muldiv", "skew_ratio_q32", "skew_publish_visible",
          "skew_visible_clock", "skew_clock_at", "skew_get_clock", "logical_count",
@@ -106,6 +109,9 @@ static void rejoin(int64_t when, uint64_t progress)
 {
     elapsed = when;
     test_cpu.skew_raw_icount = progress;
+    if (test_cpu.skew_active) {
+        active_count--;
+    }
     test_cpu.skew_active = false;
     qatomic_set_u64(&visible_slope_q32, 0);
     skew_cpu_prepare(&test_cpu);
@@ -121,7 +127,9 @@ int main(void)
     skew_momentum_reset(0);
     assert(clock_reads == 1);
     assert(sample_anchor_elapsed_ns == 0 && prev_global_icount == 0);
+    assert(!inline_publication_pending);
     test_cpus[0].skew_active = true;
+    active_count = 1;
 
     /* 400 instructions = 4ms model time, sampled over 0..10ms. */
     rejoin(8000000, 0);
@@ -176,6 +184,7 @@ int main(void)
     }
     memset(test_cpus, 0, sizeof(test_cpus));
     test_cpus[0].skew_active = true;
+    active_count = 1;
     rejoin(58000000, 0);
     test_cpus[0].skew_raw_icount = test_cpu.skew_raw_icount = 400;
     elapsed = 60000000;

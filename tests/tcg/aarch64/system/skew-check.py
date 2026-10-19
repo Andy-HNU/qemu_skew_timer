@@ -13,6 +13,8 @@ import time
 
 from skew_test_io import QemuPipe
 
+SKEW_OPTIONS = ""
+
 # QMP 控制与 QOM 读取：通过 QEMU 原生 pipe 驱动暂停、恢复和只读计数观测。
 class QMP:
     def __init__(self, stream):
@@ -82,6 +84,8 @@ def command(qemu, elf, smp=2, skew=True, ips=2000000000,
     accel = "tcg,thread=multi"
     if skew:
         accel += f",skew={window},skew-ips={ips},skew-update={update}"
+        if SKEW_OPTIONS:
+            accel += "," + SKEW_OPTIONS
     return [str(qemu), "-M", "virt,gic-version=2", "-cpu", "cortex-a57",
             "-accel", accel, "-smp", str(smp), "-m", "128M", "-display", "none",
             "-serial", "none", "-monitor", "none", "-semihosting-config",
@@ -166,7 +170,10 @@ def run_guest(qemu, out, mode, skew=True, trace=False, delay_cpu=None,
                         *shlex.split(subprocess.check_output(
                             ["pkg-config", "--cflags", "glib-2.0"], text=True)),
                         "-I", str(source.parents[3] / "include" / "qemu"),
-                        str(source / "skew-delay.c"), "-o", str(plugin)], check=True)
+                        str(source / "skew-delay.c"), "-o", str(plugin),
+                        *shlex.split(subprocess.check_output(
+                            ["pkg-config", "--libs", "glib-2.0"], text=True))],
+                       check=True)
         cmd += ["-plugin", f"{plugin},cpu={delay_cpu},ns=100000"]
     if trace:
         cmd += ["-trace", "enable=skew_*", "-D", str(log.with_suffix(".trace"))]
@@ -369,7 +376,9 @@ def controls(qemu, out, idle=False, host_runtime=True):
 def invalid_options(qemu):
     cases = ["tcg,thread=single,skew=1000000", "tcg,skew=1,skew-ips=1",
              "tcg,skew=1000000,skew-ips=0", "tcg,skew=1000000001",
-             "tcg,skew=1000000,skew-update=0"]
+             "tcg,skew=1000000,skew-update=0",
+             "tcg,skew-publish=inline", "tcg,skew-fresh-budget=on",
+             "tcg,skew-counter-fast=on", "tcg,skew=1000000,skew-publish=bad"]
     for accel in cases:
         proc = subprocess.run([str(qemu), "-M", "virt", "-accel", accel,
                                "-display", "none", "-S"], capture_output=True,
@@ -384,13 +393,17 @@ def invalid_options(qemu):
 
 # quick 仍覆盖精确计数、控制、窗口与定时器；完整模式追加参数矩阵和压力测试。
 def main():
+    global SKEW_OPTIONS
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("qemu", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--quick", action="store_true")
+    parser.add_argument("--skew-options", default="",
+                        help="extra Skew accelerator options for real guests")
     parser.add_argument("--no-host-runtime", action="store_true",
                         help="explicitly omit /proc schedstat measurement; retain control checks")
     args = parser.parse_args()
+    SKEW_OPTIONS = args.skew_options
     args.output.mkdir(parents=True, exist_ok=True)
     qemu = args.qemu.resolve()
     results = []

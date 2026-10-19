@@ -1,7 +1,8 @@
 # Skew clock
 
 本分支以 QEMU 10.2.0 为基线。仓库只维护实现、实验测试脚本、必要的
-guest/插件源码和设计说明；每次运行的日志、轨迹、图表和报告放在 `build/`。
+guest/插件源码和设计说明；每次运行的原始日志、轨迹和产物放在 `build/`，
+设计结论与适用范围保留在本目录。
 
 ## 构建与测试
 
@@ -26,8 +27,12 @@ python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
 ```
 
 - [测试入口、覆盖范围与结果判定](TEST_ACCEPTANCE_zh.md)
+- [Skew 专用测试清单：18 个独立入口](TEST_INVENTORY_2026-10-19_zh.md)
 - [性能扫描与测量方法](SKEW_SWEEP_zh.md)
 - [宿主耗时基准边界](SKEW_ICOUNT_HOST_BENCH_zh.md)
+- [固定工作量的进度发布等待复现](SKEW_PUBLICATION_REPRO_zh.md)
+- [发布、续配与计数器读取的瓶颈研究计划](SKEW_BOTTLENECK_STUDY_2026-10-19_zh.md)
+- [本次瓶颈研究的结果与适用范围](SKEW_BOTTLENECK_RESULTS_2026-10-19_zh.md)
 - [可见时间实验矩阵与独立 IPS 回归](../../paper/README.md)
 
 新运行使用新的输出目录，保留失败和超时。构建、定向单测、真实 guest
@@ -42,6 +47,7 @@ python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
 - [visible 阶段切换契约](SKEW_VISIBLE_SWITCH_zh.md)
 - [CPU 执行效率优化计划](SKEW_CPU_EFFICIENCY_PLAN_zh.md)
 - [动量插值与独立采样锚点](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)
+- [历史指数渐近模型的源码恢复状态](SKEW_ASYMPTOTIC_RECOVERY_2026-10-19_zh.md)
 
 ## 历史结果
 

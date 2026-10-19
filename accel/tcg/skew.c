@@ -24,6 +24,7 @@
 
 /* 模式只在初始化或全部停核后改变。 */
 bool use_skew;
+bool use_skew_counter_fast;
 /*
  * sim_ips 的单位是指令/秒；window 是允许领先的指令数。
  * update_interval 是宿主轮询纳秒数，不是虚拟时间步长或中断延迟保证。
@@ -31,7 +32,10 @@ bool use_skew;
 static uint64_t sim_ips, window, update_interval, window_ns;
 static int64_t start_ns;
 /* 当前 skew 阶段的全局进度单调不减，切换模式时清零。 */
-static uint64_t global_icount;
+static aligned_uint64_t global_icount;
+static SkewPublishMode publish_mode;
+static bool fresh_budget;
+static QEMUBH *publication_bh;
 /* BQL → progress_lock；持有此锁时不获取 BQL，也不访问定时器队列。 */
 static QemuMutex progress_lock;
 /* 两种模式累计贡献的纳秒数；MTTCG 当前阶段增量在读取时补入。 */
@@ -49,6 +53,9 @@ static aligned_int64_t mttcg_start_clock;
 #define SKEW_FEEDBACK_NUM 1
 #define SKEW_FEEDBACK_DEN 100
 #define SKEW_ACTIVE_SLOPE_FLOOR (SKEW_SLOPE_ONE / 256)
+/* progress_lock protects membership and the last-waiter election. */
+static unsigned active_count, waiting_count;
+static bool inline_publication_pending;
 static aligned_int64_t model_ns, visible_ns;
 /* 插值锚点可在 prepare 提升斜率时重建，不改变动量采样区间。 */
 static aligned_int64_t anchor_visible_ns, visible_anchor_elapsed_ns;
@@ -339,6 +346,7 @@ static void skew_update(void *opaque)
     CPUState *cpu;
     uint64_t candidate = UINT64_MAX;
     uint64_t completed = global_icount;
+    uint64_t next_global = global_icount;
     unsigned active = 0;
     bool idle;
     int64_t now, deadline = -1, visible, lower, upper;
@@ -377,15 +385,15 @@ static void skew_update(void *opaque)
     }
     /* MAX 保证进度不倒退；全空闲时改用已完成尾部的最大值。 */
     if (active) {
-        global_icount = MAX(global_icount, candidate);
+        next_global = MAX(next_global, candidate);
     } else if (idle) {
         /* Commit the final executed tail before entering idle time. */
-        global_icount = completed;
+        next_global = completed;
     }
 
     /* 严格模型时间仍只由 global 指令进度和空闲跳时决定。 */
     now = start_ns + warp_ns +
-          skew_muldiv(global_icount, NANOSECONDS_PER_SECOND, sim_ips);
+          skew_muldiv(next_global, NANOSECONDS_PER_SECOND, sim_ips);
 
     /*
 
@@ -396,7 +404,7 @@ static void skew_update(void *opaque)
         if (deadline > 0) {
             warp_ns += deadline;
             now += deadline;
-            trace_skew_warp(host_ns, global_icount, now, deadline);
+            trace_skew_warp(host_ns, next_global, now, deadline);
         }
     }
 
@@ -408,9 +416,9 @@ static void skew_update(void *opaque)
     elapsed_now = cpu_get_clock();
     /* delta_t 和 delta_icount 必须覆盖同一段协调采样区间。 */
     delta_t_ns = MAX(elapsed_now - sample_anchor_elapsed_ns, 0);
-    delta_icount = global_icount - prev_global_icount;
+    delta_icount = next_global - prev_global_icount;
     sample_anchor_elapsed_ns = elapsed_now;
-    prev_global_icount = global_icount;
+    prev_global_icount = next_global;
     slope = skew_momentum_add(delta_icount, delta_t_ns);
     slope = skew_feedback_slope(slope, visible - now, delta_t_ns);
     if (active) {
@@ -431,7 +439,18 @@ static void skew_update(void *opaque)
     qatomic_set_u64(&visible_slope_q32, slope);
     qatomic_set_i64(&skew_elapsed_ns, visible - mttcg_elapsed_ns);
     seqlock_write_end(&clock_seqlock);
+    /* A fresh refill must not observe new credit before its clock tuple. */
+    if (next_global != global_icount) {
+        /* Signalled threads may not have returned from cond_wait yet. */
+        waiting_count = 0;
+    }
+    qatomic_store_release(&global_icount, next_global);
     trace_skew_clock(host_ns, global_icount, now, active);
+    if (trace_event_get_state_backends(TRACE_SKEW_PUBLISH)) {
+        trace_skew_publish(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
+                           global_icount, active);
+    }
+    assert(active == active_count);
     CPU_FOREACH(cpu) {
         /* 窗口出现余量时唤醒等待线程；线程恢复后仍会重新检查等待条件。 */
         if (cpu->skew_waiting &&
@@ -457,11 +476,15 @@ static void skew_vm_state(void *opaque, bool running, RunState state)
         timer_mod(coordinator, qemu_clock_get_ns(QEMU_CLOCK_REALTIME));
     } else {
         timer_del(coordinator);
+        if (publication_bh) {
+            qemu_bh_cancel(publication_bh);
+        }
     }
 }
 
 /* 验证单位换算和计数范围；失败时不启用 skew。 */
 bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
+               SkewPublishMode mode, bool fresh, bool counter_fast,
                Error **errp)
 {
     /* Bound products, signed timer arithmetic, and reject zero budgets. */
@@ -488,8 +511,14 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
     sim_ips = ips;
     window_ns = ns;
     update_interval = update_ns;
+    publish_mode = mode;
+    fresh_budget = fresh;
+    use_skew_counter_fast = counter_fast;
     qemu_mutex_init(&progress_lock);
     coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);
+    if (mode == SKEW_PUBLISH_NOTIFY) {
+        publication_bh = qemu_bh_new(skew_update, NULL);
+    }
     qemu_add_vm_change_state_handler(skew_vm_state, NULL);
     skew_momentum_reset(0);
     qatomic_set(&use_skew, !defer);
@@ -547,7 +576,9 @@ static void skew_clock_switch(bool enable)
     }
     qatomic_set_i64(&mttcg_start_clock, elapsed_now);
     warp_ns = 0;
-    global_icount = 0;
+    qatomic_set_u64(&global_icount, 0);
+    active_count = waiting_count = 0;
+    inline_publication_pending = false;
     skew_momentum_rebase(visible, elapsed_now);
     qatomic_set(&use_skew, enable);
     seqlock_write_end(&clock_seqlock);
@@ -629,6 +660,8 @@ void skew_cpu_idle(CPUState *cpu)
     if (cpu->skew_active &&
         (cpu->stop || cpu_thread_is_idle(cpu) || !runstate_is_running())) {
         cpu->skew_active = false;
+        assert(active_count && !cpu->skew_waiting);
+        active_count--;
         trace_skew_cpu(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
                        cpu->cpu_index, false, cpu->skew_raw_icount,
                        logical_count(cpu), global_icount);
@@ -668,6 +701,7 @@ void skew_cpu_prepare(CPUState *cpu)
         cpu->skew_raw_base = qatomic_read_u64(&cpu->skew_raw_icount);
         cpu->skew_logical_base = global_icount;
         cpu->skew_active = true;
+        active_count++;
         /*
          * idle 历史允许动量衰减为零；CPU 恢复执行后立即提供一个小斜率，
          * 避免在下一次协调样本形成前连续读取相同时间。硬 window 仍限幅。
@@ -737,16 +771,51 @@ bool skew_cpu_continue(CPUState *cpu)
     while (cpu->skew_active && cpu_work_list_empty(cpu) &&
            !qatomic_load_acquire(&cpu->exit_request) &&
            logical_count(cpu) - global_icount == window) {
-        cpu->skew_waiting = true;
+        if (!cpu->skew_waiting) {
+            cpu->skew_waiting = true;
+            cpu->skew_wait_global = global_icount;
+            waiting_count++;
+        }
         trace_skew_wait(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
                         cpu->cpu_index, true, cpu->skew_raw_icount,
                         logical_count(cpu), global_icount);
+        /* Every active CPU has completed the current boundary. */
+        if (waiting_count == active_count) {
+            if (publish_mode == SKEW_PUBLISH_NOTIFY) {
+                if (trace_event_get_state_backends(TRACE_SKEW_DEMAND)) {
+                    trace_skew_demand(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
+                                      cpu->cpu_index, publish_mode,
+                                      global_icount);
+                }
+                qemu_bh_schedule(publication_bh);
+            } else if (publish_mode == SKEW_PUBLISH_INLINE &&
+                       !inline_publication_pending) {
+                inline_publication_pending = true;
+                if (trace_event_get_state_backends(TRACE_SKEW_DEMAND)) {
+                    trace_skew_demand(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
+                                      cpu->cpu_index, publish_mode,
+                                      global_icount);
+                }
+                /* Preserve BQL -> progress_lock and stay outside cpu_exec. */
+                qemu_mutex_unlock(&progress_lock);
+                bql_lock();
+                skew_update(NULL);
+                bql_unlock();
+                qemu_mutex_lock(&progress_lock);
+                inline_publication_pending = false;
+                continue;
+            }
+        }
         /* 每个 CPU 只有本线程等待 halt_cond；条件检查和 kick 通知共用此锁。 */
         qemu_cond_wait(cpu->halt_cond, &progress_lock);
     }
     /* 记录等待结束，便于 trace 重建限速行为；并非每次唤醒都一定获得预算。 */
     if (cpu->skew_waiting) {
         cpu->skew_waiting = false;
+        if (cpu->skew_wait_global == global_icount) {
+            assert(waiting_count);
+            waiting_count--;
+        }
         trace_skew_wait(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),
                         cpu->cpu_index, false, cpu->skew_raw_icount,
                         logical_count(cpu), global_icount);
@@ -775,6 +844,14 @@ static bool skew_budget_exhausted(CPUState *cpu)
     }
     /* 先发布实际完成量，再沿本轮安全窗口续配，无需退出到 MTTCG/BQL。 */
     skew_cpu_account(cpu);
+    if (fresh_budget) {
+        uint64_t grant = qatomic_load_acquire(&global_icount);
+
+        if (grant != cpu->skew_budget_global) {
+            trace_skew_fresh(cpu->cpu_index, cpu->skew_budget_global, grant);
+        }
+        return skew_cpu_refill(cpu, grant) == 0;
+    }
     return skew_cpu_refill(cpu, cpu->skew_budget_global) == 0;
 }
 
