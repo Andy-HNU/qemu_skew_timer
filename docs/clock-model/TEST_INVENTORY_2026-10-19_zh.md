@@ -3,12 +3,13 @@ SPDX-License-Identifier: GPL-2.0-or-later
 -->
 # Skew 测试清单（2026-10-19）
 
-统计范围是 `codex/skew-bottleneck-research` 中维护的 Skew 专用测试与实验，
-实现及测试源码对应本地提交 `3080189`。共 **18 个独立入口：13 个功能/回归入口，
-5 个性能/诊断入口**。不计 QEMU 上游通用测试；每个可独立执行的验收程序或
+统计范围是本仓库维护的 Skew 专用测试与实验。瓶颈研究阶段的本地提交
+`3080189` 包含 18 个入口；随后指数模型重实现新增两个入口。当前共
+**20 个独立入口：15 个功能/回归入口，5 个性能/诊断入口**。
+不计 QEMU 上游通用测试；每个可独立执行的验收程序或
 实验驱动计一个入口，同一入口的参数组合、循环次数和重复运行另行说明。
 
-## 功能与回归：13 个入口
+## 功能与回归：15 个入口
 
 | 编号 | 入口 | 覆盖范围 | 内部数量或边界 |
 |---|---|---|---|
@@ -25,13 +26,15 @@ SPDX-License-Identifier: GPL-2.0-or-later
 | 11 | [skew-linux-jitter.py](../../tests/tcg/aarch64/system/skew-linux-jitter.py) | Linux jitterentropy | 初始化及持续 AF_ALG 读取；当前入口默认 256 次读取 |
 | 12 | [skew-linux-switch.py](../../tests/tcg/aarch64/system/skew-linux-switch.py) | Linux 模式切换 | 运行中/暂停时双向转换、计数器连续性与定时器 |
 | 13 | [skew-linux-efficiency.py](../../tests/tcg/aarch64/system/skew-linux-efficiency.py) | Linux SMP 功能与总耗时 | 核数、固定计算校验、定时器、启动到退出，支持切换路径 |
+| 14 | [skew-asymptotic.py](../../tests/tcg/aarch64/system/skew-asymptotic.py) | 实际指数预测函数 | 2684 组高精度数值对照，含边界、量化平台和读取频率独立性 |
+| 15 | [skew-jitter-study.py](../../tests/tcg/aarch64/system/skew-jitter-study.py) | Linux jitter 冷启动重复矩阵 | 线性/指数/MTTCG、IPS 与发布策略；每次记录通过、失败或超时 |
 
 `test-exec-budget.c` 构建为 `build/tests/unit/test-exec-budget`。
 Linux efficiency 虽记录性能，也承担功能验收，计入功能类一次。
 
 `skew-check.py --quick` 的 15 条顶层结果为：精确计数 7 条、非法配置拒绝
 1 条、控制/idle 2 条、Guest mode 1/2/3/4/12 共 5 条。非法配置这一个结果
-内部检查 10 个错误配置，不能再加到入口总数。
+内部检查 12 个错误配置（指数选项新增两项），不能再加到入口总数。
 
 完整模式在 quick 基础上增加：普通 MTTCG 对照 4 条、IPS 3 条、窗口/更新
 间隔 4 条、慢核 3 条、额外 Guest mode 3 条、传统 icount 2 条、压力重复
@@ -42,11 +45,11 @@ Linux efficiency 虽记录性能，也承担功能验收，计入功能类一次
 
 | 编号 | 入口 | 场景与比较维度 |
 |---|---|---|
-| 14 | [skew-perf.py](../../tests/tcg/aarch64/system/skew-perf.py) | 4 类负载：total、percpu、barrier、uneven；比较 MTTCG/Skew/icount |
-| 15 | [skew-perf-sweep.py](../../tests/tcg/aarch64/system/skew-perf-sweep.py) | 默认 5 类：total、phased、memory、idle、mixed；可单独选 percpu/uneven，扫描核数 |
-| 16 | [run_matrix.py](../../paper/experiments/exp5_visible_time/run_matrix.py) | Exp5 可见时钟 13 场景，baseline/probe 对照；插桩结果用于诊断 |
-| 17 | [skew-publication-repro.py](../../tests/tcg/aarch64/system/skew-publication-repro.py) | 6 个固定配置：compute-mttcg、compute-skew、compute-delayed、compute-wide、counter-mttcg、counter-skew |
-| 18 | [skew-bottleneck-study.py](../../tests/tcg/aarch64/system/skew-bottleneck-study.py) | compute/counter 两类负载 × 可选发布、续配和计数器方案；支持 11 个命名候选配置 |
+| 16 | [skew-perf.py](../../tests/tcg/aarch64/system/skew-perf.py) | 4 类负载：total、percpu、barrier、uneven；比较 MTTCG/Skew/icount |
+| 17 | [skew-perf-sweep.py](../../tests/tcg/aarch64/system/skew-perf-sweep.py) | 默认 5 类：total、phased、memory、idle、mixed；可单独选 percpu/uneven，扫描核数 |
+| 18 | [run_matrix.py](../../paper/experiments/exp5_visible_time/run_matrix.py) | Exp5 可见时钟 13 场景，baseline/probe 对照；插桩结果用于诊断 |
+| 19 | [skew-publication-repro.py](../../tests/tcg/aarch64/system/skew-publication-repro.py) | 6 个固定配置：compute-mttcg、compute-skew、compute-delayed、compute-wide、counter-mttcg、counter-skew |
+| 20 | [skew-bottleneck-study.py](../../tests/tcg/aarch64/system/skew-bottleneck-study.py) | compute/counter 两类负载 × 可选发布、续配和计数器方案；支持 11 个命名候选配置 |
 
 `build_probe.py` 是实验构建工具，`skew-perf-report.py` 是报告工具，未另计。
 Guest C/汇编、插件、链接脚本和共享 helper 是上述入口的依赖，也未重复计数。
@@ -55,13 +58,15 @@ Guest C/汇编、插件、链接脚本和共享 helper 是上述入口的依赖�
 ## 覆盖状态与使用限制
 
 清单表示代码中存在这些入口，不表示当前提交全部执行通过。
-本轮实际验证和失败保留记录见
+此前瓶颈研究阶段的实际验证和失败保留记录见
 [瓶颈研究结果](SKEW_BOTTLENECK_RESULTS_2026-10-19_zh.md#6-验证范围失败记录与落地状态)。
 已执行的 quick、预算、CAS、动量锚点、停稳切换、CNTVOFF、慢核和真实
-Guest 模式转换均按各自范围报告；本轮缺少匹配的 Linux 内核/模块，
+Guest 模式转换均按各自范围报告；该阶段缺少匹配的 Linux 内核/模块，
 未执行 Linux jitter、Linux 切换及开机到关闭验收。
 
-历史指数曲线版本的源码尚未恢复，不包含在这 18 个入口或当前通过声明中；
+后续已取得与历史故障相同的 Linux 内核/模块，新增指数模型的实际结果见
+[重实现与 jitter 验证](SKEW_ASYMPTOTIC_REIMPLEMENTATION_2026-10-19_zh.md)。
+历史指数曲线版本的源码仍未恢复，新源码及本次结果不能代表旧提交；
 相关线索和证据限制见
 [指数模型恢复状态](SKEW_ASYMPTOTIC_RECOVERY_2026-10-19_zh.md)。
 常规运行命令及判定标准见 [测试与验收](TEST_ACCEPTANCE_zh.md)。

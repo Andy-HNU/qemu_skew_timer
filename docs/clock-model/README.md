@@ -27,7 +27,7 @@ python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
 ```
 
 - [测试入口、覆盖范围与结果判定](TEST_ACCEPTANCE_zh.md)
-- [Skew 专用测试清单：18 个独立入口](TEST_INVENTORY_2026-10-19_zh.md)
+- [Skew 专用测试清单：20 个独立入口](TEST_INVENTORY_2026-10-19_zh.md)
 - [性能扫描与测量方法](SKEW_SWEEP_zh.md)
 - [宿主耗时基准边界](SKEW_ICOUNT_HOST_BENCH_zh.md)
 - [固定工作量的进度发布等待复现](SKEW_PUBLICATION_REPRO_zh.md)
@@ -48,6 +48,7 @@ python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
 - [CPU 执行效率优化计划](SKEW_CPU_EFFICIENCY_PLAN_zh.md)
 - [动量插值与独立采样锚点](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)
 - [历史指数渐近模型的源码恢复状态](SKEW_ASYMPTOTIC_RECOVERY_2026-10-19_zh.md)
+- [指数模型重实现与 jitter 重复验证](SKEW_ASYMPTOTIC_REIMPLEMENTATION_2026-10-19_zh.md)
 
 ## 历史结果
 

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 #include "qemu/osdep.h"
+#include <math.h>
 #include "qemu/error-report.h"
 #include "hw/core/cpu.h"
 #include "exec/skew.h"
@@ -43,7 +44,7 @@ static aligned_int64_t mttcg_elapsed_ns, skew_elapsed_ns;
 static aligned_int64_t mttcg_start_clock;
 /*
  * 软件可见时间在协调周期之间按历史 global 进度插值。斜率采用 Q32 定点数，
- * 避免在时钟热路径使用浮点；8 个样本按 beta=3/4 指数衰减。
+ * 线性策略的时钟热路径无需浮点；8 个样本按 beta=3/4 指数衰减。
  */
 #define SKEW_MOMENTUM_HISTORY 8
 #define SKEW_SLOPE_SHIFT 32
@@ -53,6 +54,8 @@ static aligned_int64_t mttcg_start_clock;
 #define SKEW_FEEDBACK_NUM 1
 #define SKEW_FEEDBACK_DEN 100
 #define SKEW_ACTIVE_SLOPE_FLOOR (SKEW_SLOPE_ONE / 256)
+/* Selected at initialization; readers see a constant interpolation policy. */
+static bool exponential_interpolation;
 /* progress_lock protects membership and the last-waiter election. */
 static unsigned active_count, waiting_count;
 static bool inline_publication_pending;
@@ -150,6 +153,31 @@ static int64_t skew_publish_visible(int64_t candidate)
     return next;
 }
 
+/*
+ * A + R * (1 - exp(-s * dt / R)), R = upper - A.  The starting
+ * derivative is the momentum/feedback slope s; subsequent reads cannot
+ * alter the curve.  Work with relative offsets so large epoch timestamps
+ * do not lose nanoseconds through a double conversion.
+ *
+ * expm1 avoids cancellation close to dt=0.  Integer time still repeats:
+ * reserve the final nanosecond to prevent rounding onto the upper bound,
+ * without inventing a tick for each read or bypassing entropy health tests.
+ */
+static int64_t skew_exponential_predict(int64_t anchor, int64_t upper,
+                                       uint64_t elapsed, uint64_t slope)
+{
+    uint64_t room = upper - anchor;
+    uint64_t advance;
+    double scaled;
+
+    if (!elapsed || !slope || room <= 1) {
+        return anchor;
+    }
+    scaled = (double)elapsed * slope / (0x1p32 * room);
+    advance = (uint64_t)(-expm1(-scaled) * room);
+    return anchor + MIN(advance, room - 1);
+}
+
 /* 全部 CPU 和设备共用同一时间线；切换前使用可随 VM 暂停的原生时钟。 */
 static int64_t skew_visible_clock(int64_t elapsed_now)
 {
@@ -163,11 +191,16 @@ static int64_t skew_visible_clock(int64_t elapsed_now)
         elapsed_anchor = qatomic_read_i64(&visible_anchor_elapsed_ns);
         model = qatomic_read_i64(&model_ns);
         slope = qatomic_read_u64(&visible_slope_q32);
-        predicted = anchor +
-                    (((__uint128_t)MAX(elapsed_now - elapsed_anchor, 0) *
-                      slope) >> SKEW_SLOPE_SHIFT);
         lower = MAX(model - (int64_t)window_ns, 0);
         upper = model + window_ns;
+        if (exponential_interpolation) {
+            predicted = skew_exponential_predict(anchor, upper,
+                          MAX(elapsed_now - elapsed_anchor, 0), slope);
+        } else {
+            predicted = anchor +
+                        (((__uint128_t)MAX(elapsed_now - elapsed_anchor, 0) *
+                          slope) >> SKEW_SLOPE_SHIFT);
+        }
         predicted = MIN(MAX(predicted, lower), upper);
     } while (seqlock_read_retry(&clock_seqlock, seq));
 
@@ -412,8 +445,8 @@ static void skew_update(void *opaque)
      * 当前周期先结算旧斜率已经对外暴露的时间，再用新 global 样本生成
      * 下一周期斜率。window 只反馈偏差并施加硬边界，不参与动量输入。
      */
-    visible = skew_get_clock();
     elapsed_now = cpu_get_clock();
+    visible = skew_clock_at(elapsed_now);
     /* delta_t 和 delta_icount 必须覆盖同一段协调采样区间。 */
     delta_t_ns = MAX(elapsed_now - sample_anchor_elapsed_ns, 0);
     delta_icount = next_global - prev_global_icount;
@@ -485,7 +518,7 @@ static void skew_vm_state(void *opaque, bool running, RunState state)
 /* 验证单位换算和计数范围；失败时不启用 skew。 */
 bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
                SkewPublishMode mode, bool fresh, bool counter_fast,
-               Error **errp)
+               bool exponential, Error **errp)
 {
     /* Bound products, signed timer arithmetic, and reject zero budgets. */
     if (!ips || ips > NANOSECONDS_PER_SECOND * 1000ULL ||
@@ -514,6 +547,7 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
     publish_mode = mode;
     fresh_budget = fresh;
     use_skew_counter_fast = counter_fast;
+    exponential_interpolation = exponential;
     qemu_mutex_init(&progress_lock);
     coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);
     if (mode == SKEW_PUBLISH_NOTIFY) {

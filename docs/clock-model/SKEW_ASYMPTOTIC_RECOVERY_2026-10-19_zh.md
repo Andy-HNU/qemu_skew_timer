@@ -36,3 +36,10 @@ SPDX-License-Identifier: GPL-2.0-or-later
 版本，与性能改动集成后仍须重新验证边界、单调性、暂停/idle/模式切换及
 Linux jitter。当前 [性能研究](SKEW_BOTTLENECK_RESULTS_2026-10-19_zh.md)
 和 [测试清单](TEST_INVENTORY_2026-10-19_zh.md) 保留各自适用范围。
+
+## 同日后续：重新实现
+
+用户随后要求重新实现并重复测试 jitter。新实现基于已发布的 `fa091e0`，
+以 `skew-interp=exponential` 显式选择，默认仍为线性策略。
+[新模型与验证报告](SKEW_ASYMPTOTIC_REIMPLEMENTATION_2026-10-19_zh.md)
+记录独立源码、数学边界和实际失败；旧 `52ad72f` 的恢复缺口依旧存在。

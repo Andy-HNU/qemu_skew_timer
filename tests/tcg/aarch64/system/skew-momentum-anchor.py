@@ -32,6 +32,7 @@ prefix = r"""
 #include <stdbool.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -100,6 +101,7 @@ static void exec_budget_set(CPUState *cpu, uint32_t budget)
 #define trace_skew_publish(...) ((void)0)
 """
 names = ["skew_muldiv", "skew_ratio_q32", "skew_publish_visible",
+         "skew_exponential_predict",
          "skew_visible_clock", "skew_clock_at", "skew_get_clock", "logical_count",
          "skew_momentum_rebase", "skew_momentum_reset", "skew_momentum_add", "skew_feedback_slope",
          "skew_update", "skew_cpu_refill", "skew_cpu_prepare"]
@@ -208,7 +210,7 @@ with tempfile.TemporaryDirectory(prefix="skew-momentum-anchor-") as directory:
                "-Wextra", "-Werror", "-Wno-unused-parameter",
                "-fsanitize=undefined", "-DCONFIG_ATOMIC64", "-I",
                str(ROOT / "include"), str(path / "test.c"), "-o",
-               str(path / "test")]
+               str(path / "test"), "-lm"]
     subprocess.run(command, check=True)
     subprocess.run([str(path / "test")], check=True, timeout=10)
 

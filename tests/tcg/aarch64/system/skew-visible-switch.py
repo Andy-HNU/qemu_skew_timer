@@ -31,6 +31,7 @@ declarations = source[source.index("#define SKEW_MOMENTUM_HISTORY"):
                       source.index("/* 用宿主 REALTIME")]
 prefix = r"""
 #include "qemu/osdep.h"
+#include <math.h>
 #include <pthread.h>
 #include "qemu/thread.h"
 #include "qemu/seqlock.h"
@@ -63,7 +64,8 @@ static void tcg_cflags_set(CPUState *cpu, uint32_t flags) { cpu->tcg_cflags |= f
 static pthread_barrier_t parked, resume;
 #define PHASES 1000
 """
-names = ["skew_publish_visible", "skew_visible_clock", "skew_clock_at",
+names = ["skew_publish_visible", "skew_exponential_predict",
+         "skew_visible_clock", "skew_clock_at",
          "skew_get_clock", "skew_momentum_rebase", "skew_cpu_switch",
          "skew_clock_switch"]
 functions = "\n\n".join(function(name) for name in names)
@@ -149,7 +151,9 @@ int main(void)
     pthread_t readers[4];
     (void)clock_switching;
 
-    roundtrip(101000000, SKEW_SLOPE_ONE / 2, 102000000); /* unseen interpolation */
+    /* dt=2ms, room=1ms, s=1/2: exponential advance=floor(1ms*(1-exp(-1))). */
+    roundtrip(101000000, SKEW_SLOPE_ONE / 2,
+              exponential_interpolation ? 101632120 : 102000000);
     roundtrip(99000000, 0, 99000000); /* visible behind model; no forward jump */
     roundtrip(102000000, SKEW_SLOPE_ONE, 102000000); /* upper bound */
 
@@ -198,6 +202,7 @@ int main(void)
 """
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build-dir", type=Path, default=ROOT / "build")
+parser.add_argument("--exponential", action="store_true")
 args = parser.parse_args()
 build = args.build_dir.resolve()
 entry = next(item for item in json.loads((build / "compile_commands.json").read_text())
@@ -206,10 +211,13 @@ glib_includes = [arg for arg in shlex.split(entry["command"])
                  if arg.startswith("-I") and "glib" in arg]
 with tempfile.TemporaryDirectory(prefix="skew-visible-switch-") as directory:
     path = Path(directory)
-    (path / "test.c").write_text(prefix + declarations + functions + suffix)
+    selected = suffix.replace("int main(void)\n{", "int main(void)\n{\n" +
+                              f"    exponential_interpolation = {int(args.exponential)};")
+    assert selected != suffix
+    (path / "test.c").write_text(prefix + declarations + functions + selected)
     subprocess.run([os.environ.get("CC", "cc"), "-std=gnu11", "-O2", "-Wall",
                     "-Wextra", "-Werror", "-Wno-unused-parameter", "-pthread",
                     "-fsanitize=undefined", "-D_GNU_SOURCE", "-I", str(build),
                     "-I", str(ROOT / "include"), *glib_includes, str(path / "test.c"),
-                    "-o", str(path / "test")], check=True)
+                    "-o", str(path / "test"), "-lm"], check=True)
     subprocess.run([str(path / "test")], check=True, timeout=30)

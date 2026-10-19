@@ -4,8 +4,8 @@
 仓库根目录运行；先按 [README](README.md) 构建，并把 TMPDIR 指向
 `build/skew-tmp`。每轮输出使用新目录，保存命令、环境、二进制版本和失败日志。
 
-完整目录见 [18 个 Skew 专用测试/实验入口](TEST_INVENTORY_2026-10-19_zh.md)：
-13 个功能/回归入口、5 个性能/诊断入口。场景、参数组合及重复次数不计为
+完整目录见 [20 个 Skew 专用测试/实验入口](TEST_INVENTORY_2026-10-19_zh.md)：
+15 个功能/回归入口、5 个性能/诊断入口。场景、参数组合及重复次数不计为
 独立入口；Linux 与裸机验收分别记录。
 
 ## 最小真实 guest 路径
@@ -59,6 +59,12 @@ python3 tests/tcg/aarch64/system/skew-linux-jitter.py build/qemu-system-aarch64 
 测试从复位持续开启 skew，检查初始化及 256 次 AF_ALG 读取。分别核对退出码、
 guest 完成标记和结果，不能把初始化成功当作持续读取成功或熵质量证明。
 
+指数曲线的高精度检查入口为 `skew-asymptotic.py --output build/asymptotic-new`；
+`skew-visible-switch.py --exponential` 可选择新策略进行停稳切换夹具检查。
+真实 Linux 重复验证使用 `skew-jitter-study.py`，支持同一二进制上的
+线性/指数/MTTCG 冷启动对照、有界截止时间和完整失败记录。命令、诊断选项
+及结果见[指数模型验证报告](SKEW_ASYMPTOTIC_REIMPLEMENTATION_2026-10-19_zh.md)。
+
 ## 性能与测量边界
 
 [性能扫描](SKEW_SWEEP_zh.md)保留均匀、阶段不均衡、访存、idle 和混合负载；
@@ -67,5 +73,6 @@ guest 完成标记和结果，不能把初始化成功当作持续读取成功�
 
 正式比较使用相同二进制、负载和配置；记录预热、重复次数、随机顺序、
 宿主超时和所有失败。报告中位数及范围，不把采样最大值当严格上界，
-不把缺失指标当零。有限窗口下模型停滞会使 visible 到达上界并平台化；
+不把缺失指标当零。有限窗口下模型停滞会使线性 visible 到达上界；
+指数策略虽保留最后 1 ns，整数计时仍可能平台化。
 有限测试不等于形式化证明，硬件标定和特定业务超时仍需单独验证。

@@ -62,6 +62,7 @@ struct TCGState {
     SkewPublishMode skew_publish;
     bool skew_fresh_budget;
     bool skew_counter_fast;
+    bool skew_exponential;
 };
 typedef struct TCGState TCGState;
 
@@ -128,6 +129,22 @@ static void tcg_set_skew_counter_fast(Object *obj, bool value, Error **errp)
 {
     TCG_STATE(obj)->skew_counter_fast = value;
 }
+
+static char *tcg_get_skew_interp(Object *obj, Error **errp)
+{
+    return g_strdup(TCG_STATE(obj)->skew_exponential ? "exponential" : "linear");
+}
+
+static void tcg_set_skew_interp(Object *obj, const char *value, Error **errp)
+{
+    if (!strcmp(value, "exponential")) {
+        TCG_STATE(obj)->skew_exponential = true;
+    } else if (!strcmp(value, "linear")) {
+        TCG_STATE(obj)->skew_exponential = false;
+    } else {
+        error_setg(errp, "skew-interp must be linear or exponential");
+    }
+}
 #endif
 
 static void tcg_accel_instance_init(Object *obj)
@@ -155,6 +172,8 @@ static void tcg_accel_instance_init(Object *obj)
     object_property_add_bool(obj, "skew-counter-fast",
                              tcg_get_skew_counter_fast,
                              tcg_set_skew_counter_fast);
+    object_property_add_str(obj, "skew-interp", tcg_get_skew_interp,
+                            tcg_set_skew_interp);
 #endif
     /* If debugging enabled, default "auto on", otherwise off. */
 #if defined(CONFIG_DEBUG_TCG) && !defined(CONFIG_USER_ONLY)
@@ -236,9 +255,10 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
         return -EINVAL;
     }
     if (!s->skew_ns && (s->skew_publish != SKEW_PUBLISH_PERIODIC ||
-                       s->skew_fresh_budget || s->skew_counter_fast)) {
-        error_report("skew-publish, skew-fresh-budget and skew-counter-fast "
-                     "require skew");
+                       s->skew_fresh_budget || s->skew_counter_fast ||
+                       s->skew_exponential)) {
+        error_report("skew-publish, skew-fresh-budget, skew-counter-fast and "
+                     "exponential skew-interp require skew");
         return -EINVAL;
     }
     if (s->skew_ns) {
@@ -250,7 +270,7 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
         }
         if (!skew_init(s->skew_ns, s->skew_ips, s->skew_update_ns,
                        s->skew_defer, s->skew_publish, s->skew_fresh_budget,
-                       s->skew_counter_fast, &error_fatal)) {
+                       s->skew_counter_fast, s->skew_exponential, &error_fatal)) {
             return -EINVAL;
         }
         skew_register_clock(OBJECT(ms));
