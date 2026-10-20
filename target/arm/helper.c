@@ -36,6 +36,7 @@
 #include "semihosting/common-semi.h"
 #endif
 #include "cpregs.h"
+#include "skew-counter.h"
 
 #define ARM_CPU_FREQ 1000000000 /* FIXME: 1 GHz, should be configurable */
 
@@ -2587,6 +2588,17 @@ static uint64_t gt_virt_cnt_offset(CPUARMState *env)
 static uint64_t gt_virt_cnt_read(CPUARMState *env, const ARMCPRegInfo *ri)
 {
     return gt_get_countervalue(env) - gt_virt_cnt_offset(env);
+}
+
+bool arm_skew_counter_read(CPUARMState *env, const ARMCPRegInfo *ri,
+                           uint64_t *value)
+{
+    /* Only admit counter readers; timer state and access checks are unchanged. */
+    if (ri->readfn != gt_cnt_read && ri->readfn != gt_virt_cnt_read) {
+        return false;
+    }
+    *value = ri->readfn(env, ri);
+    return true;
 }
 
 static void gt_cval_write(CPUARMState *env, const ARMCPRegInfo *ri,

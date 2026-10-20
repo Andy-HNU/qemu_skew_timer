@@ -22,8 +22,10 @@
 #include "exec/helper-proto.h"
 #include "internals.h"
 #include "exec/exec-all.h"
+#include "exec/skew.h"
 #include "exec/cpu_ldst.h"
 #include "cpregs.h"
+#include "skew-counter.h"
 
 #define SIGNBIT (uint32_t)0x80000000
 #define SIGNBIT64 ((uint64_t)1 << 63)
@@ -753,6 +755,12 @@ uint64_t HELPER(get_cp_reg64)(CPUARMState *env, void *rip)
     uint64_t res;
 
     if (ri->type & ARM_CP_IO) {
+#ifndef CONFIG_USER_ONLY
+        if (skew_counter_fast_enabled() &&
+            arm_skew_counter_read(env, ri, &res)) {
+            return res;
+        }
+#endif
         qemu_mutex_lock_iothread();
         res = ri->readfn(env, ri);
         qemu_mutex_unlock_iothread();

@@ -1,8 +1,11 @@
 # QEMU v7.2.0 skew 移植
 
-基线为上游 `v7.2.0`（`b67b00e6b4`），功能同步到
+基线为上游 `v7.2.0`（`b67b00e6b4`），最初功能同步到
 `codex/skew-annotated-zh` 的 `17d49d3d497ce9f2235c739acfedcca7e0a0e086`。
 这是本项目的功能移植分支，上游 QEMU v7.2.0 不含这些扩展。
+2026-10-20 同步执行预算续充、BQL 外窗口等待、可选发布/Counter 优化及
+指数和自适应插值；配置和本轮结果见
+[执行效率与自适应插值移植](BACKPORT_V7_2_OPTIMIZATION_2026-10-20_zh.md)。
 
 保留单 QEMU / 多 vCPU 的 MTTCG 并行执行、独立执行预算、严格领先窗口、
 全 idle 跳时、暂停冻结、动量插值、共享 visible CAS-max、独立采样锚点，
@@ -13,8 +16,9 @@
 - 使用 `sysemu/` 头文件和 v7 的 iothread/BQL 接口。
 - 通过 `CPUState.icount_decr_ptr` 操作目标 CPU 的递减器；只写低 16 位，
   保留通用退出通知高位。原有 icount 调度和长预算策略继续使用 v7 实现。
-- MTTCG 线程保留 v7 的事件等待循环，增加 prepare/account/idle/window-wait。
+- MTTCG 线程保留 v7 的事件等待循环，增加 prepare/account/idle/continue。
   原子重试先完成再结算，TB 中途退出经公共预算接口退还未执行额度。
+  skew 的退出请求保留至外层循环，确保窗口续跑不会吞掉暂停或中断通知。
 - 新增只允许在 BQL 下、全部 vCPU stopped 后调用的同步 TB flush，
   在时钟重锚之前完成旧 TB/plugin 回调；没有把异步 flush 当作阶段屏障。
 - 使用 v7 的 migration blocker 和 TCG source-set 接口。QMP 扩展受
@@ -38,6 +42,8 @@ kernel。不能混用不同 kernel 版本的模块。
 `skew-check.py` 会读取 `/proc/PID/task/TID/schedstat` 验证两核均有运行时间。
 若宿主关闭 `kernel.sched_schedstats`，测试前应启用，测试后恢复原值。
 测试脚本不会修改宿主 sysctl。本次原值为 0，验收期间为 1，结束后恢复为 0。
+上述 sysctl 记录属于首次 WSL 移植。本轮隔离环境无法读取相应线程统计，
+可显式加 `--no-host-runtime` 省略此项测量；功能断言保留，缺失指标为 null。
 
 ```sh
 mkdir build
@@ -71,7 +77,12 @@ skew 下的 jitterentropy 初始化和 256 次 AF_ALG 读取。输出目录必�
 保留每项命令、日志、输入 SHA-256、guest/QMP 原始记录和阶段结果，遇失败
 立即返回非零，不隐藏重试。
 
-`--quick` 仅将裸机矩阵缩减为 11 个核心场景。省略 kernel/module-dir 时
+`--quick` 将裸机矩阵缩减为 15 个顶层结果，包含 13 个非法参数配置拒绝。
+`--skew-options skew-interp=adaptive` 可传递给裸机和 Linux 切换测试。
+一键入口同时执行三种插值的停稳切换夹具及指数数值检查；其性能扫描和
+原有 256 次 Linux jitter 入口仍使用各自默认配置。自适应冷启动矩阵使用
+`skew-jitter-study.py --variants adaptive`，具体命令见本轮移植记录。
+省略 kernel/module-dir 时
 仅运行无需 Linux 镜像的测试，并明确记录未请求 Linux 测试。
 
 默认长性能扫描排除 icount，保留裸机矩阵中两个短 icount 回归场景。
@@ -94,6 +105,7 @@ python3 tests/tcg/aarch64/system/skew-linux-jitter.py build/qemu-system-aarch64 
 
 ## 文档
 
+- [执行效率与自适应插值移植、当前验证结果](BACKPORT_V7_2_OPTIMIZATION_2026-10-20_zh.md)
 - [v7.2.0 实测与复现记录](BACKPORT_V7_2_VALIDATION_zh.md)
 - [时钟与窗口设计](DESIGN_zh.rst)
 - [公共执行预算](EXECUTION_BUDGET_zh.md)

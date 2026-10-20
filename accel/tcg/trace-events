@@ -11,6 +11,10 @@ translate_block(void *tb, uintptr_t pc, const void *tb_code) "tb:%p, pc:0x%"PRIx
 
 
 # skew.c
+skew_demand(int64_t host_ns, int cpu, unsigned mode, uint64_t global) "host_ns=%"PRId64" cpu=%d mode=%u global=%"PRIu64
+skew_publish(int64_t host_ns, uint64_t global, unsigned active) "host_ns=%"PRId64" global=%"PRIu64" active=%u"
+skew_fresh(int cpu, uint64_t old, uint64_t current) "cpu=%d old=%"PRIu64" current=%"PRIu64
+skew_interp(int64_t host_ns, int64_t model_ns, int64_t anchor_ns, uint64_t slope, uint64_t effective_slope, uint64_t horizon_ns) "host_ns=%"PRId64" model_ns=%"PRId64" anchor_ns=%"PRId64" slope=%"PRIu64" effective_slope=%"PRIu64" horizon_ns=%"PRIu64
 # 每轮协调后的全局进度、虚拟纳秒与活跃成员数。
 skew_clock(int64_t host_ns, uint64_t global, int64_t ns, unsigned active) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" active=%u"
 # CPU 加入/离开活动集合时记录 raw、logical 与全局基准。
@@ -21,3 +25,8 @@ skew_wait(int64_t host_ns, int cpu, bool waiting, uint64_t raw, uint64_t logical
 skew_warp(int64_t host_ns, uint64_t global, int64_t ns, int64_t delta) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" delta=%"PRId64
 # 协调更新前的逐 CPU 快照，供验收复算逻辑进度及窗口上限。
 skew_sample(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t raw_base, uint64_t logical_base, uint64_t logical) "host_ns=%"PRId64" cpu=%d active=%d raw=%"PRIu64" raw_base=%"PRIu64" logical_base=%"PRIu64" logical=%"PRIu64
+
+# Every grant is bounded by this completed progress snapshot.
+skew_budget(int cpu, uint64_t logical, uint64_t global, uint32_t budget) "cpu=%d logical=%"PRIu64" global=%"PRIu64" budget=%u"
+skew_run(int cpu, int reason) "cpu=%d reason=%d"
+skew_outer(int cpu, int reason) "cpu=%d reason=%d"

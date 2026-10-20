@@ -47,6 +47,11 @@ struct TCGState {
     unsigned long tb_size;
     uint64_t skew_ns, skew_ips, skew_update_ns;
     bool skew_defer;
+    unsigned skew_publish;
+    bool skew_fresh_budget;
+    bool skew_counter_fast;
+    bool skew_exponential;
+    bool skew_adaptive;
 };
 typedef struct TCGState TCGState;
 
@@ -107,6 +112,70 @@ static void tcg_set_skew_defer(Object *obj, bool value, Error **errp)
 {
     TCG_STATE(obj)->skew_defer = value;
 }
+
+static const char *const skew_publish_names[] = {
+    "periodic", "notify", "inline",
+};
+
+static char *tcg_get_skew_publish(Object *obj, Error **errp)
+{
+    return g_strdup(skew_publish_names[TCG_STATE(obj)->skew_publish]);
+}
+
+static void tcg_set_skew_publish(Object *obj, const char *value, Error **errp)
+{
+    for (unsigned i = 0; i < G_N_ELEMENTS(skew_publish_names); i++) {
+        if (!strcmp(value, skew_publish_names[i])) {
+            TCG_STATE(obj)->skew_publish = i;
+            return;
+        }
+    }
+    error_setg(errp, "skew-publish must be periodic, notify or inline");
+}
+
+static bool tcg_get_skew_fresh_budget(Object *obj, Error **errp)
+{
+    return TCG_STATE(obj)->skew_fresh_budget;
+}
+
+static void tcg_set_skew_fresh_budget(Object *obj, bool value, Error **errp)
+{
+    TCG_STATE(obj)->skew_fresh_budget = value;
+}
+
+static bool tcg_get_skew_counter_fast(Object *obj, Error **errp)
+{
+    return TCG_STATE(obj)->skew_counter_fast;
+}
+
+static void tcg_set_skew_counter_fast(Object *obj, bool value, Error **errp)
+{
+    TCG_STATE(obj)->skew_counter_fast = value;
+}
+
+static char *tcg_get_skew_interp(Object *obj, Error **errp)
+{
+    if (TCG_STATE(obj)->skew_adaptive) {
+        return g_strdup("adaptive");
+    }
+    return g_strdup(TCG_STATE(obj)->skew_exponential ? "exponential" : "linear");
+}
+
+static void tcg_set_skew_interp(Object *obj, const char *value, Error **errp)
+{
+    if (!strcmp(value, "adaptive")) {
+        TCG_STATE(obj)->skew_exponential = true;
+        TCG_STATE(obj)->skew_adaptive = true;
+    } else if (!strcmp(value, "exponential")) {
+        TCG_STATE(obj)->skew_exponential = true;
+        TCG_STATE(obj)->skew_adaptive = false;
+    } else if (!strcmp(value, "linear")) {
+        TCG_STATE(obj)->skew_exponential = false;
+        TCG_STATE(obj)->skew_adaptive = false;
+    } else {
+        error_setg(errp, "skew-interp must be linear, exponential or adaptive");
+    }
+}
 #endif
 
 static void tcg_accel_instance_init(Object *obj)
@@ -128,6 +197,16 @@ static void tcg_accel_instance_init(Object *obj)
                                    OBJ_PROP_FLAG_READWRITE);
     object_property_add_bool(obj, "skew-defer", tcg_get_skew_defer,
                              tcg_set_skew_defer);
+    object_property_add_str(obj, "skew-publish", tcg_get_skew_publish,
+                            tcg_set_skew_publish);
+    object_property_add_bool(obj, "skew-fresh-budget",
+                             tcg_get_skew_fresh_budget,
+                             tcg_set_skew_fresh_budget);
+    object_property_add_bool(obj, "skew-counter-fast",
+                             tcg_get_skew_counter_fast,
+                             tcg_set_skew_counter_fast);
+    object_property_add_str(obj, "skew-interp", tcg_get_skew_interp,
+                            tcg_set_skew_interp);
 #endif
 
     /* If debugging enabled, default "auto on", otherwise off. */
@@ -170,6 +249,13 @@ static int tcg_init_machine(MachineState *ms)
         error_report("skew-defer requires a nonzero skew window");
         return -EINVAL;
     }
+    if (!s->skew_ns && (s->skew_publish != SKEW_PUBLISH_PERIODIC ||
+                       s->skew_fresh_budget || s->skew_counter_fast ||
+                       s->skew_exponential)) {
+        error_report("skew-publish, skew-fresh-budget, skew-counter-fast and "
+                     "exponential skew-interp require skew");
+        return -EINVAL;
+    }
     if (s->skew_ns) {
         if (!default_mttcg_enabled() || !s->mttcg_enabled ||
             icount_enabled() || replay_mode != REPLAY_MODE_NONE) {
@@ -178,7 +264,9 @@ static int tcg_init_machine(MachineState *ms)
             return -EINVAL;
         }
         if (!skew_init(s->skew_ns, s->skew_ips, s->skew_update_ns,
-                       s->skew_defer, &error_fatal)) {
+                       s->skew_defer, s->skew_publish, s->skew_fresh_budget,
+                       s->skew_counter_fast, s->skew_exponential,
+                       s->skew_adaptive, &error_fatal)) {
             return -EINVAL;
         }
         skew_register_clock(OBJECT(ms));

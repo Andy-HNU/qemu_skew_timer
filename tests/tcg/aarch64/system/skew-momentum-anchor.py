@@ -18,7 +18,7 @@ source = (ROOT / "accel/tcg/skew.c").read_text()
 
 
 def function(name):
-    match = re.search(r"^(?:static )?(?:uint64_t|int64_t|void) " + name +
+    match = re.search(r"^(?:static )?(?:uint16_t|uint64_t|int64_t|void) " + name +
                       r"\(.*?\n\}", source, re.M | re.S)
     if not match:
         raise RuntimeError(f"Function not found: {name}")
@@ -32,6 +32,7 @@ prefix = r"""
 #include <stdbool.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,6 +45,11 @@ prefix = r"""
 #define QEMU_CLOCK_VIRTUAL 1
 #define QEMU_TIMER_ATTR_ALL 0
 typedef unsigned QemuSeqLock;
+typedef unsigned QemuMutex;
+static QemuMutex progress_lock;
+/* This existing fixture is single threaded; real guest tests exercise locking. */
+static void qemu_mutex_lock(QemuMutex *lock) { }
+static void qemu_mutex_unlock(QemuMutex *lock) { }
 typedef struct CPUState {
     uint64_t skew_raw_icount, skew_raw_base, skew_logical_base;
     uint64_t skew_budget_global;
@@ -88,18 +94,28 @@ static void exec_budget_set(CPUState *cpu, uint32_t budget)
 #define trace_skew_sample(host, ...) ((void)(host))
 #define trace_skew_warp(host, ...) ((void)(host))
 #define trace_skew_clock(host, ...) ((void)(host))
+#define trace_skew_interp(...) ((void)0)
 #define trace_skew_cpu(...) ((void)0)
+#define trace_skew_budget(...) ((void)0)
+#define TRACE_SKEW_PUBLISH 0
+#define trace_event_get_state_backends(event) false
+#define trace_skew_publish(...) ((void)0)
 """
 names = ["skew_muldiv", "skew_ratio_q32", "skew_publish_visible",
+         "skew_exponential_predict", "skew_exponential_slope",
+         "skew_horizon_reset", "skew_horizon_update",
          "skew_visible_clock", "skew_clock_at", "skew_get_clock", "logical_count",
          "skew_momentum_rebase", "skew_momentum_reset", "skew_momentum_add", "skew_feedback_slope",
-         "skew_update", "skew_cpu_prepare"]
+         "skew_update", "skew_cpu_refill", "skew_cpu_prepare"]
 functions = "\n\n".join(function(name) for name in names)
 suffix = r"""
 static void rejoin(int64_t when, uint64_t progress)
 {
     elapsed = when;
     test_cpu.skew_raw_icount = progress;
+    if (test_cpu.skew_active) {
+        active_count--;
+    }
     test_cpu.skew_active = false;
     qatomic_set_u64(&visible_slope_q32, 0);
     skew_cpu_prepare(&test_cpu);
@@ -115,7 +131,9 @@ int main(void)
     skew_momentum_reset(0);
     assert(clock_reads == 1);
     assert(sample_anchor_elapsed_ns == 0 && prev_global_icount == 0);
+    assert(!inline_publication_pending);
     test_cpus[0].skew_active = true;
+    active_count = 1;
 
     /* 400 instructions = 4ms model time, sampled over 0..10ms. */
     rejoin(8000000, 0);
@@ -170,6 +188,7 @@ int main(void)
     }
     memset(test_cpus, 0, sizeof(test_cpus));
     test_cpus[0].skew_active = true;
+    active_count = 1;
     rejoin(58000000, 0);
     test_cpus[0].skew_raw_icount = test_cpu.skew_raw_icount = 400;
     elapsed = 60000000;
@@ -193,7 +212,7 @@ with tempfile.TemporaryDirectory(prefix="skew-momentum-anchor-") as directory:
                "-Wextra", "-Werror", "-Wno-unused-parameter",
                "-fsanitize=undefined", "-DCONFIG_ATOMIC64", "-I",
                str(ROOT / "include"), str(path / "test.c"), "-o",
-               str(path / "test")]
+               str(path / "test"), "-lm"]
     subprocess.run(command, check=True)
     subprocess.run([str(path / "test")], check=True, timeout=10)
 

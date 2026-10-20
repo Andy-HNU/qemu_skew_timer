@@ -33,6 +33,7 @@
 #include "qemu/rcu.h"
 #include "exec/log.h"
 #include "exec/exec-budget.h"
+#include "exec/skew.h"
 #include "qemu/main-loop.h"
 #if defined(TARGET_I386) && !defined(CONFIG_USER_ONLY)
 #include "hw/i386/apic.h"
@@ -850,7 +851,14 @@ static inline bool cpu_handle_interrupt(CPUState *cpu,
         || ((cpu->cflags_next_tb == -1 ||
              cpu->cflags_next_tb & CF_USE_ICOUNT)
             && exec_budget_exhausted(cpu))) {
-        qatomic_set(&cpu->exit_request, 0);
+        /*
+         * v7 normally consumes the kick here. Skew must retain it until
+         * the outer MTTCG event loop, so a pause/IRQ cannot look like a
+         * pure window exit to skew_cpu_continue().
+         */
+        if (!skew_enabled()) {
+            qatomic_set(&cpu->exit_request, 0);
+        }
         if (cpu->exception_index == -1) {
             cpu->exception_index = EXCP_INTERRUPT;
         }

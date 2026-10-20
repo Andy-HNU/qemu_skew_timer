@@ -36,6 +36,7 @@
 
 #include "tcg-accel-ops.h"
 #include "tcg-accel-ops-mttcg.h"
+#include "trace.h"
 
 typedef struct MttcgForceRcuNotifier {
     Notifier notifier;
@@ -99,13 +100,20 @@ static void *mttcg_cpu_thread_fn(void *arg)
                 skew_cpu_prepare(cpu);
             }
             qemu_mutex_unlock_iothread();
-            r = tcg_cpus_exec(cpu);
-            if (skew_enabled() && r == EXCP_ATOMIC) {
-                cpu_exec_step_atomic(cpu);
-                r = EXCP_INTERRUPT;
-            }
+            do {
+                r = tcg_cpus_exec(cpu);
+                if (skew_enabled() && r == EXCP_ATOMIC) {
+                    cpu_exec_step_atomic(cpu);
+                    r = EXCP_INTERRUPT;
+                }
+                if (skew_enabled()) {
+                    skew_cpu_account(cpu);
+                    trace_skew_run(cpu->cpu_index, r);
+                }
+            } while (skew_enabled() && r == EXCP_INTERRUPT &&
+                     skew_cpu_continue(cpu));
             if (skew_enabled()) {
-                skew_cpu_account(cpu);
+                trace_skew_outer(cpu->cpu_index, r);
             }
             qemu_mutex_lock_iothread();
             switch (r) {
@@ -131,9 +139,6 @@ static void *mttcg_cpu_thread_fn(void *arg)
                 /* Ignore everything else? */
                 break;
             }
-            if (skew_enabled()) {
-                skew_cpu_wait(cpu);
-            }
         }
 
         qatomic_mb_set(&cpu->exit_request, 0);
@@ -154,6 +159,10 @@ static void *mttcg_cpu_thread_fn(void *arg)
 void mttcg_kick_vcpu_thread(CPUState *cpu)
 {
     cpu_exit(cpu);
+    if (skew_configured()) {
+        /* Publish the exit request before waking a progress-lock waiter. */
+        skew_cpu_kick(cpu);
+    }
 }
 
 void mttcg_start_vcpu_thread(CPUState *cpu)

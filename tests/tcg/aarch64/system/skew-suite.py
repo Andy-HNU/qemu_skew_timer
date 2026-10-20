@@ -20,7 +20,11 @@ def main():
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--quick', action='store_true',
-                        help='Run the 11-case guest subset instead of the full matrix')
+                        help='Run the 15-case guest subset instead of the full matrix')
+    parser.add_argument('--no-host-runtime', action='store_true',
+                        help='Omit inaccessible /proc schedstat measurement explicitly')
+    parser.add_argument('--skew-options', default='',
+                        help='Extra Skew options for bare-metal and Linux switching')
     parser.add_argument('--include-slow-icount', action='store_true',
                         help='Include icount in the performance matrix (can be very slow)')
     parser.add_argument('--kernel', type=Path)
@@ -86,12 +90,20 @@ def main():
             raise SystemExit(f"See {output / (name + '.log')}")
 
     run('exec-budget', [build / 'tests/unit/test-exec-budget'])
+    run('skew-asymptotic', [sys.executable, source / 'skew-asymptotic.py',
+                            '--output', output / 'numerical'])
     for name in ['skew-momentum-anchor', 'skew-visible-cas', 'skew-perf-sweep-test']:
         run(name, [sys.executable, source / (name + '.py')])
     run('skew-visible-switch', [sys.executable, source / 'skew-visible-switch.py',
                                 '--build-dir', build])
+    for policy in ['exponential', 'adaptive']:
+        run('skew-visible-switch-' + policy,
+            [sys.executable, source / 'skew-visible-switch.py',
+             '--build-dir', build, '--' + policy])
     command = [sys.executable, source / 'skew-check.py', qemu,
-               '--output', output / 'guest']
+               '--output', output / 'guest', '--skew-options', args.skew_options]
+    if args.no_host_runtime:
+        command.append('--no-host-runtime')
     if args.quick:
         command.append('--quick')
     run('guest', command)
@@ -106,7 +118,8 @@ def main():
             run(f'linux-switch-{iteration + 1}',
                 [sys.executable, source / 'skew-linux-switch.py', qemu,
                  '--kernel', args.kernel, '--jitter-module', args.module_dir / 'jitterentropy_rng.ko',
-                 '--output', output / f'linux-switch-{iteration + 1}'])
+                 '--output', output / f'linux-switch-{iteration + 1}',
+                 '--skew-options', args.skew_options])
         run('linux-jitter', [sys.executable, source / 'skew-linux-jitter.py', qemu,
                             '--kernel', args.kernel, '--module-dir', args.module_dir,
                             '--output', output / 'linux-jitter'])

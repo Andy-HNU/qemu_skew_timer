@@ -3,6 +3,10 @@
 
 以下是**单 QEMU、多 vCPU**的测试设计范围，不能作为当前 checkout 的通过报告。实际入口与 v7 覆盖范围见 [README](README.md) 和 [移植验收记录](BACKPORT_V7_2_VALIDATION_zh.md)。双核收发包为设计主场景，`-smp 1` 用于验证基础计数与时钟换算。
 
+2026-10-20 的执行预算、BQL 外等待和自适应插值移植，以及本轮独立验证，
+见[当前移植记录](BACKPORT_V7_2_OPTIMIZATION_2026-10-20_zh.md)。quick 已扩展为
+15 个顶层结果；16 位槽耗尽后可在执行循环内续充到当前安全窗口边界。
+
 当前 `skew-check.py`、`skew-linux-switch.py` 和 `skew-linux-jitter.py`
 使用 QEMU 原生 `pipe:` 字符设备，通过 `TMPDIR` 下的 POSIX FIFO 传送
 QMP、GDB 和串口协议，不需要 Unix/TCP socket。运行前将 `TMPDIR` 指向

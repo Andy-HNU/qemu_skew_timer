@@ -125,7 +125,8 @@ def run_case(args, archive, out, paused):
                '-serial', f'pipe:{spath}',
                '-qmp', f'pipe:{qpath}',
                '-accel', 'tcg,thread=multi,skew=1000000,skew-ips=2000000000,'
-                         'skew-update=100000,skew-defer=on',
+                         'skew-update=100000,skew-defer=on' +
+                         (',' + args.skew_options if args.skew_options else ''),
                '-kernel', str(args.kernel), '-initrd', str(archive),
                '-append', 'console=ttyAMA0 earlycon rdinit=/init nokaslr loglevel=7']
         (out / 'command.json').write_text(json.dumps(cmd, indent=2))
@@ -275,6 +276,7 @@ def main():
     parser.add_argument('--jitter-module', required=True, type=pathlib.Path)
     parser.add_argument('--output', required=True, type=pathlib.Path)
     parser.add_argument('--cc', default='aarch64-linux-gnu-gcc')
+    parser.add_argument('--skew-options', default='')
     args = parser.parse_args()
     for field in ['qemu', 'kernel', 'jitter_module', 'output']:
         setattr(args, field, getattr(args, field).resolve())

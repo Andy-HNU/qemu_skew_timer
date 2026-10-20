@@ -359,13 +359,15 @@ struct CPUState {
     /* 以下长预算与扩展额度仅属于传统 icount 时间模型。 */
     int64_t icount_budget;
     int64_t icount_extra;
-    /* MTTCG skew clock: raw is atomic; membership and bases use the BQL. */
+    /* MTTCG skew: raw is atomic; membership/bases use BQL + progress_lock. */
     /* 原子发布的累计完成指令数；重新加入活动集合时不清零。 */
     uint64_t skew_raw_icount;
     /* skew 本轮发放的额度；与 icount_budget/icount_extra 完全独立。 */
     uint32_t skew_budget;
     /* 发放预算时的 global 快照，用于无锁结算中的窗口越界检测。 */
     uint64_t skew_budget_global;
+    /* 等待轮次的 global 快照，由 progress_lock 保护。 */
+    uint64_t skew_wait_global;
     /* 本次加入时的 raw 快照，用于扣除先前执行历史。 */
     uint64_t skew_raw_base;
     /* 本次加入时对齐的全局进度；logical = base + raw - raw_base。 */
