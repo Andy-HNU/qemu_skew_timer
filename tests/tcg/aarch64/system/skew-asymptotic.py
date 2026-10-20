@@ -27,14 +27,29 @@ def main():
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     source = (ROOT / "accel/tcg/skew.c").read_text()
-    match = re.search(r"^static int64_t skew_exponential_predict\(.*?\n\}",
-                      source, re.M | re.S)
-    if not match:
-        raise RuntimeError("production exponential predictor not found")
-    code = "#include <stdint.h>\n#include <math.h>\n"
-    code += "#define MIN(a,b) ((a)<(b)?(a):(b))\n" + match.group()
+    code = "#include <stdint.h>\n#include <math.h>\n#include <stdbool.h>\n"
+    code += "#include <string.h>\n#define MIN(a,b) ((a)<(b)?(a):(b))\n"
+    code += "#define MAX(a,b) ((a)>(b)?(a):(b))\n"
+    code += "#define SKEW_HORIZON_HISTORY 8\n"
+    code += "static uint64_t progress_intervals[SKEW_HORIZON_HISTORY];\n"
+    code += "static unsigned progress_interval_pos;\n"
+    code += "static int64_t progress_anchor_elapsed_ns;\n"
+    code += "static uint64_t publication_horizon_ns, update_interval;\n"
+    for name in ("skew_exponential_predict", "skew_exponential_slope",
+                 "skew_horizon_reset", "skew_horizon_update"):
+        match = re.search(r"^static (?:int64_t|uint64_t|void) " + name +
+                          r"\(.*?\n\}", source, re.M | re.S)
+        if not match:
+            raise RuntimeError(f"production function not found: {name}")
+        code += match.group() + "\n"
     code += "\nint64_t predict(int64_t a, int64_t u, uint64_t t, uint64_t s)\n"
     code += "{ return skew_exponential_predict(a, u, t, s); }\n"
+    code += "uint64_t limit_slope(uint64_t r, uint64_t s, uint64_t h)\n"
+    code += "{ return skew_exponential_slope(r, s, h); }\n"
+    code += "void reset_horizon(int64_t now, uint64_t interval)\n"
+    code += "{ update_interval = interval; skew_horizon_reset(now); }\n"
+    code += "uint64_t horizon(int64_t now, bool progressed)\n"
+    code += "{ return skew_horizon_update(now, progressed); }\n"
     (output / "predict.c").write_text(code)
     command = [os.environ.get("CC", "cc"), "-O2", "-Wall", "-Wextra",
                "-Werror", "-shared", "-fPIC", "-fsanitize=undefined",
@@ -46,6 +61,9 @@ def main():
     predict.restype = ctypes.c_int64
     predict.argtypes = [ctypes.c_int64, ctypes.c_int64,
                         ctypes.c_uint64, ctypes.c_uint64]
+    limit_slope = library.limit_slope
+    limit_slope.restype = ctypes.c_uint64
+    limit_slope.argtypes = [ctypes.c_uint64] * 3
     cases, max_error = 0, 0
     with localcontext() as context:
         context.prec = 80
@@ -79,6 +97,53 @@ def main():
                         previous = actual
                         cases += 1
 
+        adaptive_cases, retention_cases = 0, 0
+        for room in (1, 2, 16, 1000, 1000000, 2000000000):
+            for slope in (0, 1, ONE // 256, ONE // 16, ONE):
+                for horizon in (100000, 1000000, 10000000, 125000000, 10**9):
+                    effective = limit_slope(room, slope, horizon)
+                    assert 0 <= effective <= slope
+                    for anchor in (0, (1 << 53) + 111, MAX_TIME - room):
+                        previous = anchor
+                        for elapsed in (0, 1, horizon // 16, horizon,
+                                        2 * horizon, 1000 * horizon):
+                            actual = predict(anchor, anchor + room, elapsed, effective)
+                            decay = min(Decimal(slope) / (ONE * room),
+                                        Decimal(5).ln() / horizon)
+                            advance = int(room * (1 - (-decay * elapsed).exp()))
+                            expected = anchor + min(advance, room - 1)
+                            # Limiting the starting slope rounds down by <1 Q32.
+                            tolerance = 1 + elapsed // ONE
+                            record = dict(anchor=anchor, room=room, slope=slope,
+                                          horizon=horizon, elapsed=elapsed,
+                                          effective=effective, actual=actual,
+                                          expected=expected, tolerance=tolerance)
+                            assert abs(actual - expected) <= tolerance, record
+                            assert anchor <= previous <= actual < anchor + room, record
+                            assert actual <= predict(anchor, anchor + room, elapsed, slope), record
+                            if elapsed == horizon:
+                                assert 5 * (anchor + room - actual) >= room, record
+                                retention_cases += 1
+                            previous = actual
+                            adaptive_cases += 1
+
+    # Empty polls accumulate age; only effective progress enters the history.
+    library.reset_horizon.argtypes = [ctypes.c_int64, ctypes.c_uint64]
+    library.reset_horizon.restype = None
+    library.horizon.argtypes = [ctypes.c_int64, ctypes.c_bool]
+    library.horizon.restype = ctypes.c_uint64
+    library.reset_horizon(0, 100000)
+    assert library.horizon(100000, False) == 100000
+    assert library.horizon(400000, False) == 400000
+    assert library.horizon(1000000, True) == 1000000
+    assert library.horizon(1200000, False) == 1000000
+    for i in range(1, 9):
+        observed = library.horizon(1000000 + i * 200000, True)
+        assert observed == (1000000 if i < 8 else 200000)
+    assert library.horizon(5000000, False) == 2400000
+    library.reset_horizon(10000000, 100000)
+    assert library.horizon(10100000, True) == 100000
+
     # Sparse and dense reads of the same fixed segment have identical results.
     room, slope, end = 1000000, ONE // 16, 16000000
     sparse = predict(0, room, end, slope)
@@ -91,6 +156,8 @@ def main():
     assert late == room - 1 == predict(0, room, 10**12 + 1, ONE)
     assert late // 16 == (room - 16) // 16
     result = dict(passed=True, numerical_cases=cases, maximum_error_ns=max_error,
+                  adaptive_cases=adaptive_cases, retention_cases=retention_cases,
+                  effective_progress_horizon=True,
                   read_schedule_independent=True, reanchor_continuous=True,
                   integer_plateau_explicitly_detected=True,
                   source_sha256=hashlib.sha256(source.encode()).hexdigest(),

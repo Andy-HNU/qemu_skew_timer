@@ -94,6 +94,7 @@ static void exec_budget_set(CPUState *cpu, uint32_t budget)
 #define trace_skew_sample(host, ...) ((void)(host))
 #define trace_skew_warp(host, ...) ((void)(host))
 #define trace_skew_clock(host, ...) ((void)(host))
+#define trace_skew_interp(...) ((void)0)
 #define trace_skew_cpu(...) ((void)0)
 #define trace_skew_budget(...) ((void)0)
 #define TRACE_SKEW_PUBLISH 0
@@ -101,7 +102,8 @@ static void exec_budget_set(CPUState *cpu, uint32_t budget)
 #define trace_skew_publish(...) ((void)0)
 """
 names = ["skew_muldiv", "skew_ratio_q32", "skew_publish_visible",
-         "skew_exponential_predict",
+         "skew_exponential_predict", "skew_exponential_slope",
+         "skew_horizon_reset", "skew_horizon_update",
          "skew_visible_clock", "skew_clock_at", "skew_get_clock", "logical_count",
          "skew_momentum_rebase", "skew_momentum_reset", "skew_momentum_add", "skew_feedback_slope",
          "skew_update", "skew_cpu_refill", "skew_cpu_prepare"]

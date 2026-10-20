@@ -60,10 +60,13 @@ python3 tests/tcg/aarch64/system/skew-linux-jitter.py build/qemu-system-aarch64 
 guest 完成标记和结果，不能把初始化成功当作持续读取成功或熵质量证明。
 
 指数曲线的高精度检查入口为 `skew-asymptotic.py --output build/asymptotic-new`；
-`skew-visible-switch.py --exponential` 可选择新策略进行停稳切换夹具检查。
+该入口同时检查自适应时间常数的余量约束和有效发布间隔估计。
+`skew-visible-switch.py --exponential` 或 `--adaptive` 可选择对应策略进行
+停稳切换夹具检查。
 真实 Linux 重复验证使用 `skew-jitter-study.py`，支持同一二进制上的
-线性/指数/MTTCG 冷启动对照、有界截止时间和完整失败记录。命令、诊断选项
+线性/指数/自适应指数/MTTCG 冷启动对照、有界截止时间和完整失败记录。命令、诊断选项
 及结果见[指数模型验证报告](SKEW_ASYMPTOTIC_REIMPLEMENTATION_2026-10-19_zh.md)。
+自适应曲线及 500M IPS 对照见[发布间隔适配报告](SKEW_ADAPTIVE_EXPONENTIAL_2026-10-20_zh.md)。
 
 ## 性能与测量边界
 

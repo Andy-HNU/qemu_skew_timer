@@ -379,7 +379,8 @@ def invalid_options(qemu):
              "tcg,skew=1000000,skew-update=0",
              "tcg,skew-publish=inline", "tcg,skew-fresh-budget=on",
              "tcg,skew-counter-fast=on", "tcg,skew=1000000,skew-publish=bad",
-             "tcg,skew-interp=exponential", "tcg,skew=1000000,skew-interp=bad"]
+             "tcg,skew-interp=exponential", "tcg,skew-interp=adaptive",
+             "tcg,skew=1000000,skew-interp=bad"]
     for accel in cases:
         proc = subprocess.run([str(qemu), "-M", "virt", "-accel", accel,
                                "-display", "none", "-S"], capture_output=True,

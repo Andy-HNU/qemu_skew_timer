@@ -41,6 +41,7 @@ static aligned_int64_t mttcg_elapsed_ns, skew_elapsed_ns, mttcg_start_clock;
 static int64_t start_ns;
 static uint64_t global_icount;
 static uint64_t window_ns = 2000000;
+static uint64_t update_interval = 10000000;
 static bool bql_locked(void) { return true; }
 static bool runstate_is_running(void) { return false; }
 static bool skew_enabled(void) { return qatomic_read(&use_skew); }
@@ -65,6 +66,7 @@ static pthread_barrier_t parked, resume;
 #define PHASES 1000
 """
 names = ["skew_publish_visible", "skew_exponential_predict",
+         "skew_exponential_slope", "skew_horizon_reset",
          "skew_visible_clock", "skew_clock_at",
          "skew_get_clock", "skew_momentum_rebase", "skew_cpu_switch",
          "skew_clock_switch"]
@@ -101,6 +103,8 @@ static void seed_skew(int64_t visible, uint64_t slope)
     skew_momentum_rebase(visible, 498000000);
     qatomic_set_i64(&model_ns, 100000000);
     qatomic_set_u64(&visible_slope_q32, slope);
+    qatomic_set_u64(&visible_exponential_slope_q32,
+        skew_exponential_slope(102000000 - visible, slope, update_interval));
     momentum_history_count = 1;
     momentum_history_pos = 1;
     momentum_history_slope[0] = SKEW_SLOPE_ONE;
@@ -153,6 +157,7 @@ int main(void)
 
     /* dt=2ms, room=1ms, s=1/2: exponential advance=floor(1ms*(1-exp(-1))). */
     roundtrip(101000000, SKEW_SLOPE_ONE / 2,
+              adaptive_interpolation ? 101275220 :
               exponential_interpolation ? 101632120 : 102000000);
     roundtrip(99000000, 0, 99000000); /* visible behind model; no forward jump */
     roundtrip(102000000, SKEW_SLOPE_ONE, 102000000); /* upper bound */
@@ -203,6 +208,7 @@ int main(void)
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--build-dir", type=Path, default=ROOT / "build")
 parser.add_argument("--exponential", action="store_true")
+parser.add_argument("--adaptive", action="store_true")
 args = parser.parse_args()
 build = args.build_dir.resolve()
 entry = next(item for item in json.loads((build / "compile_commands.json").read_text())
@@ -212,7 +218,8 @@ glib_includes = [arg for arg in shlex.split(entry["command"])
 with tempfile.TemporaryDirectory(prefix="skew-visible-switch-") as directory:
     path = Path(directory)
     selected = suffix.replace("int main(void)\n{", "int main(void)\n{\n" +
-                              f"    exponential_interpolation = {int(args.exponential)};")
+                              f"    exponential_interpolation = {int(args.exponential or args.adaptive)};\n" +
+                              f"    adaptive_interpolation = {int(args.adaptive)};")
     assert selected != suffix
     (path / "test.c").write_text(prefix + declarations + functions + selected)
     subprocess.run([os.environ.get("CC", "cc"), "-std=gnu11", "-O2", "-Wall",

@@ -56,6 +56,13 @@ static aligned_int64_t mttcg_start_clock;
 #define SKEW_ACTIVE_SLOPE_FLOOR (SKEW_SLOPE_ONE / 256)
 /* Selected at initialization; readers see a constant interpolation policy. */
 static bool exponential_interpolation;
+static bool adaptive_interpolation;
+/* BQL protects effective model-publication intervals, excluding idle epochs. */
+#define SKEW_HORIZON_HISTORY 8
+static uint64_t progress_intervals[SKEW_HORIZON_HISTORY];
+static unsigned progress_interval_pos;
+static int64_t progress_anchor_elapsed_ns;
+static uint64_t publication_horizon_ns;
 /* progress_lock protects membership and the last-waiter election. */
 static unsigned active_count, waiting_count;
 static bool inline_publication_pending;
@@ -63,6 +70,8 @@ static aligned_int64_t model_ns, visible_ns;
 /* 插值锚点可在 prepare 提升斜率时重建，不改变动量采样区间。 */
 static aligned_int64_t anchor_visible_ns, visible_anchor_elapsed_ns;
 static aligned_uint64_t visible_slope_q32;
+/* Limited once per anchor; the reader retains the existing exponential cost. */
+static aligned_uint64_t visible_exponential_slope_q32;
 /* BQL 保护：采样时间与指令基线只在协调采样或阶段初始化时成对更新。 */
 static int64_t sample_anchor_elapsed_ns;
 static uint64_t prev_global_icount;
@@ -178,6 +187,50 @@ static int64_t skew_exponential_predict(int64_t anchor, int64_t upper,
     return anchor + MIN(advance, room - 1);
 }
 
+/*
+ * tau = max(R / s, H / ln(5)): keep at least 20% of this segment's
+ * initial room at H. Store the equivalent starting slope in Q32, rounded
+ * down. The requested momentum remains separate from this curvature limit.
+ */
+static uint64_t skew_exponential_slope(uint64_t room, uint64_t slope,
+                                      uint64_t horizon)
+{
+    double limit;
+
+    if (room <= 1 || !horizon) {
+        return 0;
+    }
+    limit = (double)room * 1.6094379124341003 * 0x1p32 / horizon;
+    return limit >= slope ? slope : (uint64_t)limit;
+}
+
+static void skew_horizon_reset(int64_t elapsed_now)
+{
+    memset(progress_intervals, 0, sizeof(progress_intervals));
+    progress_interval_pos = 0;
+    progress_anchor_elapsed_ns = elapsed_now;
+    publication_horizon_ns = update_interval;
+}
+
+/* Polls without model progress must not masquerade as short publications. */
+static uint64_t skew_horizon_update(int64_t elapsed_now, bool progressed)
+{
+    uint64_t age = MAX(elapsed_now - progress_anchor_elapsed_ns, 0);
+    uint64_t horizon = MAX(update_interval, age);
+
+    if (progressed) {
+        progress_intervals[progress_interval_pos] = age;
+        progress_interval_pos = (progress_interval_pos + 1) %
+                                SKEW_HORIZON_HISTORY;
+        progress_anchor_elapsed_ns = elapsed_now;
+    }
+    for (unsigned i = 0; i < SKEW_HORIZON_HISTORY; i++) {
+        horizon = MAX(horizon, progress_intervals[i]);
+    }
+    publication_horizon_ns = horizon;
+    return horizon;
+}
+
 /* 全部 CPU 和设备共用同一时间线；切换前使用可随 VM 暂停的原生时钟。 */
 static int64_t skew_visible_clock(int64_t elapsed_now)
 {
@@ -194,6 +247,9 @@ static int64_t skew_visible_clock(int64_t elapsed_now)
         lower = MAX(model - (int64_t)window_ns, 0);
         upper = model + window_ns;
         if (exponential_interpolation) {
+            if (adaptive_interpolation) {
+                slope = qatomic_read_u64(&visible_exponential_slope_q32);
+            }
             predicted = skew_exponential_predict(anchor, upper,
                           MAX(elapsed_now - elapsed_anchor, 0), slope);
         } else {
@@ -316,6 +372,8 @@ static void skew_momentum_rebase(int64_t now, int64_t elapsed_now)
     qatomic_set_i64(&anchor_visible_ns, now);
     qatomic_set_i64(&visible_anchor_elapsed_ns, elapsed_now);
     qatomic_set_u64(&visible_slope_q32, 0);
+    qatomic_set_u64(&visible_exponential_slope_q32, 0);
+    skew_horizon_reset(elapsed_now);
 }
 
 static void skew_momentum_reset(int64_t now)
@@ -383,7 +441,7 @@ static void skew_update(void *opaque)
     unsigned active = 0;
     bool idle;
     int64_t now, deadline = -1, visible, lower, upper;
-    uint64_t delta_icount, slope, delta_t_ns;
+    uint64_t delta_icount, slope, delta_t_ns, exponential_slope;
     int64_t elapsed_now;
     int64_t old_ns = skew_get_clock();
     int64_t host_ns = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
@@ -463,6 +521,14 @@ static void skew_update(void *opaque)
     lower = MAX(now - (int64_t)window_ns, 0);
     upper = now + window_ns;
     visible = MIN(MAX(visible, lower), upper);
+    if (adaptive_interpolation) {
+        if (active) {
+            skew_horizon_update(elapsed_now,
+                                now > qatomic_read_i64(&model_ns));
+        } else {
+            skew_horizon_reset(elapsed_now);
+        }
+    }
     seqlock_write_begin(&clock_seqlock);
     qatomic_set_i64(&model_ns, now);
     /* Keep a reader's later publication; anchor at the value we committed. */
@@ -470,8 +536,14 @@ static void skew_update(void *opaque)
     qatomic_set_i64(&anchor_visible_ns, visible);
     qatomic_set_i64(&visible_anchor_elapsed_ns, elapsed_now);
     qatomic_set_u64(&visible_slope_q32, slope);
+    exponential_slope = adaptive_interpolation ?
+        skew_exponential_slope(upper - visible, slope,
+                               publication_horizon_ns) : slope;
+    qatomic_set_u64(&visible_exponential_slope_q32, exponential_slope);
     qatomic_set_i64(&skew_elapsed_ns, visible - mttcg_elapsed_ns);
     seqlock_write_end(&clock_seqlock);
+    trace_skew_interp(host_ns, now, visible, slope, exponential_slope,
+                      adaptive_interpolation ? publication_horizon_ns : 0);
     /* A fresh refill must not observe new credit before its clock tuple. */
     if (next_global != global_icount) {
         /* Signalled threads may not have returned from cond_wait yet. */
@@ -518,7 +590,7 @@ static void skew_vm_state(void *opaque, bool running, RunState state)
 /* 验证单位换算和计数范围；失败时不启用 skew。 */
 bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
                SkewPublishMode mode, bool fresh, bool counter_fast,
-               bool exponential, Error **errp)
+               bool exponential, bool adaptive, Error **errp)
 {
     /* Bound products, signed timer arithmetic, and reject zero budgets. */
     if (!ips || ips > NANOSECONDS_PER_SECOND * 1000ULL ||
@@ -548,6 +620,7 @@ bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
     fresh_budget = fresh;
     use_skew_counter_fast = counter_fast;
     exponential_interpolation = exponential;
+    adaptive_interpolation = adaptive;
     qemu_mutex_init(&progress_lock);
     coordinator = timer_new_ns(QEMU_CLOCK_REALTIME, skew_update, NULL);
     if (mode == SKEW_PUBLISH_NOTIFY) {
@@ -732,6 +805,10 @@ void skew_cpu_prepare(CPUState *cpu)
     if (!cpu->skew_active) {
         int64_t visible = skew_get_clock();
 
+        if (adaptive_interpolation && !active_count) {
+            skew_horizon_reset(cpu_get_clock());
+        }
+
         cpu->skew_raw_base = qatomic_read_u64(&cpu->skew_raw_icount);
         cpu->skew_logical_base = global_icount;
         cpu->skew_active = true;
@@ -747,6 +824,11 @@ void skew_cpu_prepare(CPUState *cpu)
             qatomic_set_i64(&visible_anchor_elapsed_ns, cpu_get_clock());
             qatomic_set_u64(&visible_slope_q32,
                             SKEW_ACTIVE_SLOPE_FLOOR);
+            qatomic_set_u64(&visible_exponential_slope_q32,
+                adaptive_interpolation ? skew_exponential_slope(
+                    qatomic_read_i64(&model_ns) + window_ns - visible,
+                    SKEW_ACTIVE_SLOPE_FLOOR, publication_horizon_ns) :
+                    SKEW_ACTIVE_SLOPE_FLOOR);
             seqlock_write_end(&clock_seqlock);
         }
         trace_skew_cpu(qemu_clock_get_ns(QEMU_CLOCK_REALTIME),

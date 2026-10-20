@@ -1,7 +1,7 @@
 <!--
 SPDX-License-Identifier: GPL-2.0-or-later
 -->
-# Skew 测试清单（2026-10-19）
+# Skew 测试清单（2026-10-20 更新）
 
 统计范围是本仓库维护的 Skew 专用测试与实验。瓶颈研究阶段的本地提交
 `3080189` 包含 18 个入口；随后指数模型重实现新增两个入口。当前共
@@ -26,15 +26,15 @@ SPDX-License-Identifier: GPL-2.0-or-later
 | 11 | [skew-linux-jitter.py](../../tests/tcg/aarch64/system/skew-linux-jitter.py) | Linux jitterentropy | 初始化及持续 AF_ALG 读取；当前入口默认 256 次读取 |
 | 12 | [skew-linux-switch.py](../../tests/tcg/aarch64/system/skew-linux-switch.py) | Linux 模式切换 | 运行中/暂停时双向转换、计数器连续性与定时器 |
 | 13 | [skew-linux-efficiency.py](../../tests/tcg/aarch64/system/skew-linux-efficiency.py) | Linux SMP 功能与总耗时 | 核数、固定计算校验、定时器、启动到退出，支持切换路径 |
-| 14 | [skew-asymptotic.py](../../tests/tcg/aarch64/system/skew-asymptotic.py) | 实际指数预测函数 | 2684 组高精度数值对照，含边界、量化平台和读取频率独立性 |
-| 15 | [skew-jitter-study.py](../../tests/tcg/aarch64/system/skew-jitter-study.py) | Linux jitter 冷启动重复矩阵 | 线性/指数/MTTCG、IPS 与发布策略；每次记录通过、失败或超时 |
+| 14 | [skew-asymptotic.py](../../tests/tcg/aarch64/system/skew-asymptotic.py) | 实际指数预测函数 | 2684 组原曲线、2700 组自适应曲线数值对照；含 450 组 H 末余量检查及有效发布间隔估计 |
+| 15 | [skew-jitter-study.py](../../tests/tcg/aarch64/system/skew-jitter-study.py) | Linux jitter 冷启动重复矩阵 | 线性/指数/自适应指数/MTTCG、IPS 与发布策略；每次记录通过、失败或超时 |
 
 `test-exec-budget.c` 构建为 `build/tests/unit/test-exec-budget`。
 Linux efficiency 虽记录性能，也承担功能验收，计入功能类一次。
 
 `skew-check.py --quick` 的 15 条顶层结果为：精确计数 7 条、非法配置拒绝
 1 条、控制/idle 2 条、Guest mode 1/2/3/4/12 共 5 条。非法配置这一个结果
-内部检查 12 个错误配置（指数选项新增两项），不能再加到入口总数。
+内部检查 13 个错误配置（自适应选项新增一项），不能再加到入口总数。
 
 完整模式在 quick 基础上增加：普通 MTTCG 对照 4 条、IPS 3 条、窗口/更新
 间隔 4 条、慢核 3 条、额外 Guest mode 3 条、传统 icount 2 条、压力重复

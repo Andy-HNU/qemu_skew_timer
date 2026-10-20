@@ -32,7 +32,8 @@ typedef enum SkewPublishMode {
 
 bool skew_init(uint64_t ns, uint64_t ips, uint64_t update_ns, bool defer,
                SkewPublishMode publish_mode, bool fresh_budget,
-               bool counter_fast, bool exponential, Error **errp);
+               bool counter_fast, bool exponential, bool adaptive,
+               Error **errp);
 /* 已配置但可尚未启用；用于安装时钟路由和观测接口。 */
 bool skew_configured(void);
 /*

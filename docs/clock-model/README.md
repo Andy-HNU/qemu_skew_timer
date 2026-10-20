@@ -49,6 +49,7 @@ python3 tests/tcg/aarch64/system/skew-check.py build/qemu-system-aarch64 \
 - [动量插值与独立采样锚点](SKEW_VISIBLE_TIME_MOMENTUM_zh.rst)
 - [历史指数渐近模型的源码恢复状态](SKEW_ASYMPTOTIC_RECOVERY_2026-10-19_zh.md)
 - [指数模型重实现与 jitter 重复验证](SKEW_ASYMPTOTIC_REIMPLEMENTATION_2026-10-19_zh.md)
+- [按有效发布间隔调整曲线：200M、500M、2G IPS 对照](SKEW_ADAPTIVE_EXPONENTIAL_2026-10-20_zh.md)
 
 ## 历史结果
 

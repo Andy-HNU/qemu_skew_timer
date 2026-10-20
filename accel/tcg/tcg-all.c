@@ -63,6 +63,7 @@ struct TCGState {
     bool skew_fresh_budget;
     bool skew_counter_fast;
     bool skew_exponential;
+    bool skew_adaptive;
 };
 typedef struct TCGState TCGState;
 
@@ -132,17 +133,25 @@ static void tcg_set_skew_counter_fast(Object *obj, bool value, Error **errp)
 
 static char *tcg_get_skew_interp(Object *obj, Error **errp)
 {
+    if (TCG_STATE(obj)->skew_adaptive) {
+        return g_strdup("adaptive");
+    }
     return g_strdup(TCG_STATE(obj)->skew_exponential ? "exponential" : "linear");
 }
 
 static void tcg_set_skew_interp(Object *obj, const char *value, Error **errp)
 {
-    if (!strcmp(value, "exponential")) {
+    if (!strcmp(value, "adaptive")) {
         TCG_STATE(obj)->skew_exponential = true;
+        TCG_STATE(obj)->skew_adaptive = true;
+    } else if (!strcmp(value, "exponential")) {
+        TCG_STATE(obj)->skew_exponential = true;
+        TCG_STATE(obj)->skew_adaptive = false;
     } else if (!strcmp(value, "linear")) {
         TCG_STATE(obj)->skew_exponential = false;
+        TCG_STATE(obj)->skew_adaptive = false;
     } else {
-        error_setg(errp, "skew-interp must be linear or exponential");
+        error_setg(errp, "skew-interp must be linear, exponential or adaptive");
     }
 }
 #endif
@@ -270,7 +279,8 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
         }
         if (!skew_init(s->skew_ns, s->skew_ips, s->skew_update_ns,
                        s->skew_defer, s->skew_publish, s->skew_fresh_budget,
-                       s->skew_counter_fast, s->skew_exponential, &error_fatal)) {
+                       s->skew_counter_fast, s->skew_exponential,
+                       s->skew_adaptive, &error_fatal)) {
             return -EINVAL;
         }
         skew_register_clock(OBJECT(ms));

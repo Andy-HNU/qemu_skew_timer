@@ -35,6 +35,7 @@ tb_flush(void) ""
 # skew.c
 # 每轮协调后的全局进度、虚拟纳秒与活跃成员数。
 skew_clock(int64_t host_ns, uint64_t global, int64_t ns, unsigned active) "host_ns=%"PRId64" global=%"PRIu64" ns=%"PRId64" active=%u"
+skew_interp(int64_t host_ns, int64_t model_ns, int64_t anchor_ns, uint64_t slope, uint64_t effective_slope, uint64_t horizon_ns) "host_ns=%"PRId64" model_ns=%"PRId64" anchor_ns=%"PRId64" slope=%"PRIu64" effective_slope=%"PRIu64" horizon_ns=%"PRIu64
 # CPU 加入/离开活动集合时记录 raw、logical 与全局基准。
 skew_cpu(int64_t host_ns, int cpu, bool active, uint64_t raw, uint64_t logical, uint64_t global) "host_ns=%"PRId64" cpu=%d active=%d raw=%"PRIu64" logical=%"PRIu64" global=%"PRIu64
 # 窗口边界等待的进入/退出，用来验证限速而非忙等。

@@ -104,7 +104,7 @@ def run(args, item, archive, directory, deadline):
     save(directory / "command.json", command)
     row = dict(item, passed=False, command=command, requested_reads=args.reads,
                diagnostic=args.trace or args.sample_seconds > 0 or args.health_probes,
-               samples=[],
+               samples=[], stage_wall_seconds={},
                error=None, failure_kind=None)
     text = bytearray()
     qmp = None
@@ -141,6 +141,11 @@ def run(args, item, archive, directory, deadline):
                 text.extend(chunk)
                 slog.write(chunk)
                 slog.flush()
+                for marker in ("LINUX_INIT_ENTERED", "JITTER_INIT_PASS",
+                               "JITTER_USE_BEGIN", "JITTER_USE_PASS"):
+                    if (marker not in row["stage_wall_seconds"] and
+                            marker.encode() in text):
+                        row["stage_wall_seconds"][marker] = time.monotonic() - start
                 failure = re.search(rb"JITTER_TEST_FAIL[^\r\n]*[\r\n]", text)
                 if failure:
                     row["failure_kind"] = ("probe_setup_failure" if
@@ -200,7 +205,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cc", default="aarch64-linux-gnu-gcc")
     parser.add_argument("--ips", type=int, nargs="+", default=[200000000, 2000000000])
-    parser.add_argument("--variants", nargs="+", choices=["linear", "exponential", "mttcg"],
+    parser.add_argument("--variants", nargs="+",
+                        choices=["linear", "exponential", "adaptive", "mttcg"],
                         default=["linear", "exponential", "mttcg"])
     parser.add_argument("--profiles", nargs="+", choices=PROFILES, default=["nominal"])
     parser.add_argument("--cpus", type=int, default=2)
